@@ -449,6 +449,10 @@ input,select,textarea{font-family:inherit;}
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
         Abrir
       </button>
+      <button class="btn ghost sm" onclick="abrirImportPedido()" title="Importar una lista de piezas (JSON) pegando el texto o subiendo un archivo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+        Importar pedido
+      </button>
       <input type="file" id="projectUpload" accept="application/json,.json" style="display:none;">
       <div style="position:relative;">
         <button class="btn" id="btnExport">
@@ -1130,9 +1134,9 @@ window.abrirFormPlaca=abrirFormPlaca;
 const COLS = [
   { key:'codigo',      label:'Código',      type:'text', ci:0  },
   { key:'descripcion', label:'Descripción', type:'text', ci:1  },
-  { key:'l',           label:'Largo',       type:'num',  ci:2  },
-  { key:'a',           label:'Ancho',       type:'num',  ci:3  },
-  { key:'cantidad',    label:'Cant.',       type:'num',  ci:4  },
+  { key:'cantidad',    label:'Cant.',       type:'num',  ci:2  },
+  { key:'l',           label:'Largo',       type:'num',  ci:3  },
+  { key:'a',           label:'Ancho',       type:'num',  ci:4  },
   { key:'rotable',     label:'⟲',          type:'chk',  ci:5  },
   { key:'vetaFija',    label:'Veta',        type:'chk',  ci:6  },
 ];
@@ -1329,7 +1333,7 @@ const piezasGrid = (() => {
     let h = `<table class="gt" style="border-collapse:collapse;width:100%;table-layout:fixed;">
     <colgroup>
       <col style="width:22px"><col style="width:60px"><col style="width:66px">
-      <col style="width:50px"><col style="width:50px"><col style="width:40px">
+      <col style="width:40px"><col style="width:50px"><col style="width:50px">
       <col style="width:28px"><col style="width:40px">
       <col style="width:64px">
     </colgroup>
@@ -1338,9 +1342,9 @@ const piezasGrid = (() => {
         <th class="ghd" style="width:22px">#</th>
         <th class="ghd">Cód.</th>
         <th class="ghd">Desc.</th>
+        <th class="ghd">Cant.</th>
         <th class="ghd">Largo<br><small style="font-weight:400;color:var(--text2)">(${currentUnit})</small></th>
         <th class="ghd">Ancho<br><small style="font-weight:400;color:var(--text2)">(${currentUnit})</small></th>
-        <th class="ghd">Cant.</th>
         <th class="ghd" title="Permite rotación">⟲</th>
         <th class="ghd" title="Veta fija">Veta</th>
         <th class="ghd" title="Tapacantos: hacé clic en cada flecha para activar el lateral">Tapac.</th>
@@ -1355,9 +1359,9 @@ const piezasGrid = (() => {
         <td class="gnd" onclick="piezasGrid._sel(${i})">${i+1}</td>
         <td class="gtd"><input class="gc gct" data-r="${i}" data-c="codigo" data-ci="0" value="${r.codigo||''}" placeholder="A001" spellcheck="false"></td>
         <td class="gtd"><input class="gc gct" data-r="${i}" data-c="descripcion" data-ci="1" value="${r.descripcion||''}" placeholder="Desc." spellcheck="false" title="${(r.descripcion||'').replace(/"/g,'&quot;')}"></td>
-        <td class="gtd"><input class="gc gcn" data-r="${i}" data-c="l" data-ci="2" type="number" value="${lv}" min="0.001" step="any" placeholder="0"></td>
-        <td class="gtd"><input class="gc gcn" data-r="${i}" data-c="a" data-ci="3" type="number" value="${av}" min="0.001" step="any" placeholder="0"></td>
-        <td class="gtd"><input class="gc gcn" data-r="${i}" data-c="cantidad" data-ci="4" type="number" value="${r.cantidad||1}" min="1" step="1" style="text-align:center"></td>
+        <td class="gtd"><input class="gc gcn" data-r="${i}" data-c="cantidad" data-ci="2" type="number" value="${r.cantidad||1}" min="1" step="1" style="text-align:center"></td>
+        <td class="gtd"><input class="gc gcn" data-r="${i}" data-c="l" data-ci="3" type="number" value="${lv}" min="0.001" step="any" placeholder="0"></td>
+        <td class="gtd"><input class="gc gcn" data-r="${i}" data-c="a" data-ci="4" type="number" value="${av}" min="0.001" step="any" placeholder="0"></td>
         <td class="gtd gchk"><input type="checkbox" class="gchkbox" data-r="${i}" data-c="rotable" data-ci="5" ${r.rotable?'checked':''}></td>
         <td class="gtd gchk"><input type="checkbox" class="gchkbox" data-r="${i}" data-c="vetaFija" data-ci="6" ${r.vetaFija?'checked':''}></td>
         <td class="gtd">
@@ -2243,6 +2247,84 @@ function renderArmarioDiagram(){
   box.innerHTML = `<div>${svg}<div style="font-size:9.5px;color:var(--text2);text-align:center;line-height:1.5;margin-top:2px;">${legend.join(' · ')}</div></div>`;
 }
 window.renderArmarioDiagram=renderArmarioDiagram;
+
+/* =====================================================================
+   IMPORTAR PEDIDO: pega el JSON de renglones (cantidad, largo, ancho, cantos)
+   o subí el archivo .json, y se agregan como filas a la grilla de piezas.
+===================================================================== */
+function abrirImportPedido(){
+  $('modalRoot').innerHTML = `
+    <div class="modal-ov" id="mo" onclick="if(event.target.id==='mo')closeModal()">
+      <div class="modal-box" style="width:480px;">
+        <div class="modal-head"><h3>Importar pedido</h3><button class="btn icon ghost" onclick="closeModal()" style="font-size:16px">✕</button></div>
+        <div class="modal-body">
+          <div style="font-size:11.5px;color:var(--text2);line-height:1.6;">
+            Pegá el texto JSON (con "renglones": cantidad, largo, ancho, cantos) o subí el archivo. Las piezas se agregan a la grilla actual, sin borrar lo que ya tenías.
+          </div>
+          <div class="field">
+            <label>Pegar JSON acá</label>
+            <textarea id="importPedidoTexto" rows="8" placeholder='{"renglones":[{"cantidad":6,"largo_mt":1,"ancho_mt":0.2,...}]}' style="width:100%;background:var(--bg2);border:1px solid var(--line2);border-radius:7px;color:var(--text0);padding:8px 10px;font-size:12px;font-family:'JetBrains Mono',monospace;resize:vertical;"></textarea>
+          </div>
+          <div class="field">
+            <label>...o subir archivo .json</label>
+            <input type="file" id="importPedidoArchivo" accept="application/json,.json">
+          </div>
+          <div id="importPedidoMsg" style="font-size:11.5px;color:var(--bad);display:none;"></div>
+        </div>
+        <div class="modal-foot">
+          <button class="btn ghost" onclick="closeModal()">Cancelar</button>
+          <button class="btn primary" onclick="procesarImportPedido()">Importar</button>
+        </div>
+      </div>
+    </div>`;
+  $('importPedidoArchivo').addEventListener('change', e=>{
+    const f = e.target.files[0];
+    if (!f) return;
+    const r = new FileReader();
+    r.onload = ev => { $('importPedidoTexto').value = ev.target.result; };
+    r.readAsText(f);
+  });
+}
+window.abrirImportPedido = abrirImportPedido;
+
+function procesarImportPedido(){
+  const raw = $('importPedidoTexto').value.trim();
+  const msgEl = $('importPedidoMsg');
+  msgEl.style.display = 'none';
+  if (!raw) { msgEl.textContent = 'Pegá el JSON o subí un archivo primero.'; msgEl.style.display = 'block'; return; }
+  let data;
+  try { data = JSON.parse(raw); }
+  catch(e) { msgEl.textContent = 'El texto no es un JSON válido: ' + e.message; msgEl.style.display = 'block'; return; }
+
+  const renglones = Array.isArray(data) ? data : (Array.isArray(data.renglones) ? data.renglones : null);
+  if (!renglones || !renglones.length) { msgEl.textContent = 'No se encontraron "renglones" en el JSON.'; msgEl.style.display = 'block'; return; }
+  const unidadArchivo = (data.unidad && UNIT[data.unidad]) ? data.unidad : 'mm';
+  const factor = UNIT[unidadArchivo];
+
+  const piezas = renglones.map((r,i) => {
+    const largoKey = Object.keys(r).find(k => /^largo(_|$)/.test(k));
+    const anchoKey = Object.keys(r).find(k => /^ancho(_|$)/.test(k));
+    const largoVal = largoKey ? r[largoKey] : (r.largo ?? 0);
+    const anchoVal = anchoKey ? r[anchoKey] : (r.ancho ?? 0);
+    const cantos = r.cantos || {};
+    return {
+      codigo: r.codigo || ('IMP'+String(i+1).padStart(3,'0')),
+      descripcion: r.descripcion || r.producto || '',
+      l: (parseFloat(largoVal)||0) * factor,
+      a: (parseFloat(anchoVal)||0) * factor,
+      cantidad: Math.max(1, parseInt(r.cantidad)||1),
+      rotable: true, vetaFija: false,
+      tapacantos: { sup:!!cantos.sup, inf:!!cantos.inf, izq:!!cantos.izq, der:!!cantos.der },
+    };
+  }).filter(p => p.l>0 && p.a>0);
+
+  if (!piezas.length) { msgEl.textContent = 'Ningún renglón tenía medidas válidas de largo/ancho.'; msgEl.style.display = 'block'; return; }
+
+  piezasGrid.addRows(piezas);
+  closeModal();
+  toast(`${piezas.length} pieza(s) importada(s).`);
+}
+window.procesarImportPedido = procesarImportPedido;
 
 function abrirMuebles(){
   mbState = { secciones: [], puertas: { enabled:false } };
