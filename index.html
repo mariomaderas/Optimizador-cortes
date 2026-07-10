@@ -2430,7 +2430,9 @@ $('btnExport').addEventListener('click',e=>{
     <button onclick="exportCSV();closeExp()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>Lista de cortes (CSV)</button>
     <div class="sep"></div>
     <button onclick="exportPNG();closeExp()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>Plano actual (PNG)</button>
-    <button onclick="exportSVG();closeExp()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l9 5v10l-9 5-9-5V7z"/></svg>Plano actual (SVG)</button>`;
+    <button onclick="exportSVG();closeExp()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l9 5v10l-9 5-9-5V7z"/></svg>Plano actual (SVG)</button>
+    <div class="sep"></div>
+    <button onclick="exportPedidosJSON();closeExp()" title="Formato para importar en el Sistema de Pedidos"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>Lista para Sistema de Pedidos (JSON)</button>`;
   // Posición fija calculada desde el botón, y se mueve a <body> para que ningún ancestro con
   // overflow (como la barra superior, que puede scrollear) lo recorte o lo esconda.
   document.body.appendChild(m);
@@ -2475,6 +2477,49 @@ function exportSVG(){
   const a=document.createElement('a');a.download=`plano_placa_${ST.placaIdx+1}.svg`;a.href=URL.createObjectURL(new Blob([svg],{type:'image/svg+xml'}));a.click();toast('SVG exportado.');
 }
 window.exportSVG=exportSVG;
+
+/* Lista de cortes agrupada por (código + medidas + material real usado + tapacantos),
+   en un formato pensado para poder importarla en el "Sistema de Pedidos" (Google Apps Script).
+   Las medidas van en la misma unidad activa en la app (mt/cm/mm) al momento de exportar. */
+function exportPedidosJSON(){
+  const s=reqSol();if(!s)return;
+  const grupos={};
+  const orden=[];
+  const campoLargo=`largo_${currentUnit}`, campoAncho=`ancho_${currentUnit}`;
+  s.eps.forEach(e=>{
+    e.col.forEach(c=>{
+      const tc=c.pz.tapacantos;
+      const key=[c.pz.codigo,Math.round(c.l),Math.round(c.a),e.pb.nombre,tc.sup?1:0,tc.inf?1:0,tc.izq?1:0,tc.der?1:0].join('|');
+      if(!grupos[key]){
+        grupos[key]={
+          cantidad:0,
+          codigo:c.pz.codigo,
+          descripcion:c.pz.descripcion||'',
+          [campoLargo]:fromMm(c.l),
+          [campoAncho]:fromMm(c.a),
+          producto:e.pb.nombre,
+          cantos:{sup:!!tc.sup,inf:!!tc.inf,izq:!!tc.izq,der:!!tc.der},
+        };
+        orden.push(key);
+      }
+      grupos[key].cantidad++;
+    });
+  });
+  const rows=orden.map(k=>grupos[k]);
+  const payload={
+    origen:'Optimizador de cortes',
+    generado:new Date().toISOString(),
+    unidad:currentUnit,
+    renglones:rows,
+  };
+  const json=JSON.stringify(payload,null,2);
+  const a=document.createElement('a');
+  a.download='lista_para_pedidos.json';
+  a.href=URL.createObjectURL(new Blob([json],{type:'application/json'}));
+  a.click();
+  toast('Lista exportada para el Sistema de Pedidos.');
+}
+window.exportPedidosJSON=exportPedidosJSON;
 
 function exportCSV(){
   const s=reqSol();if(!s)return;
