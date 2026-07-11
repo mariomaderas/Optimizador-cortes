@@ -102,6 +102,8 @@ input,select,textarea{font-family:inherit;}
 .btn.primary{background:var(--blue);border-color:var(--blue);color:#fff;}
 .btn.primary:hover{background:var(--blue2);}
 .btn.primary:disabled{opacity:.4;cursor:not-allowed;}
+#btnOpt{background:#f97316;border-color:#f97316;}
+#btnOpt:hover{background:#ea660a;}
 .btn.ghost{background:transparent;border-color:transparent;}
 .btn.sm{padding:5px 9px;font-size:11.5px;}
 .btn.icon{width:30px;height:30px;padding:0;justify-content:center;border-radius:6px;}
@@ -521,16 +523,16 @@ input,select,textarea{font-family:inherit;}
         <div id="cfg-bar" onclick="event.stopPropagation()">
           <div class="cg">
             <span class="cl">Kerf</span>
-            <input type="number" class="ci" id="cfgKerf" value="0.004" min="0" step=".001">
+            <input type="text" inputmode="decimal" class="ci" id="cfgKerf" value="0.004">
             <span style="font-size:10px;color:var(--text2)" id="cfgKerfLbl">mt</span>
           </div>
           <div class="cg">
             <span class="cl">Mg. exterior</span>
-            <input type="number" class="ci" id="cfgMgExt" value="0.01" min="0" step=".001">
+            <input type="text" inputmode="decimal" class="ci" id="cfgMgExt" value="0.01">
           </div>
           <div class="cg">
             <span class="cl">Mg. piezas</span>
-            <input type="number" class="ci" id="cfgMgPz" value="0" min="0" step=".001">
+            <input type="text" inputmode="decimal" class="ci" id="cfgMgPz" value="0">
           </div>
           <label class="tog" style="justify-content:space-between;">
             <span class="cl">Rotación auto</span>
@@ -615,12 +617,12 @@ input,select,textarea{font-family:inherit;}
         <div style="display:flex;flex-direction:column;gap:4px;">
           <div style="display:flex;align-items:center;gap:6px;">
             <span style="font-size:9.5px;color:var(--text2);font-weight:700;text-transform:uppercase;width:70px;">Precio unit.</span>
-            <input type="number" id="precioUnitario" value="0" min="0" step="any" title="Precio de venta aplicado por igual a cada pieza optimizada"
+            <input type="text" inputmode="decimal" id="precioUnitario" value="0" title="Precio de venta aplicado por igual a cada pieza optimizada"
               style="width:74px;background:var(--bg2);border:1px solid var(--line2);border-radius:5px;color:var(--text0);padding:5px 6px;font-size:12px;font-family:'JetBrains Mono',monospace;text-align:center;">
           </div>
           <div style="display:flex;align-items:center;gap:6px;">
             <span style="font-size:9.5px;color:var(--text2);font-weight:700;text-transform:uppercase;width:70px;">Descuento %</span>
-            <input type="number" id="descuentoPct" value="0" min="0" max="100" step="any" title="Descuento (%) aplicado sobre el precio unitario"
+            <input type="text" inputmode="decimal" id="descuentoPct" value="0" title="Descuento (%) aplicado sobre el precio unitario"
               style="width:74px;background:var(--bg2);border:1px solid var(--line2);border-radius:5px;color:var(--text0);padding:5px 6px;font-size:12px;font-family:'JetBrains Mono',monospace;text-align:center;">
           </div>
         </div>
@@ -719,7 +721,9 @@ function toast(msg, t='ok') {
 const UNIT = { mm:1, cm:10, mt:1000 };
 let currentUnit = 'mt';
 
-function toMm(v) { return parseFloat(v||0) * UNIT[currentUnit]; }
+/* Acepta tanto punto como coma como separador decimal (convención local) */
+function numVal(v){ return parseFloat(String(v??'').trim().replace(',','.')); }
+function toMm(v) { return (numVal(v)||0) * UNIT[currentUnit]; }
 function fromMm(v) {
   const r = v / UNIT[currentUnit];
   return currentUnit === 'mm' ? Math.round(r*10)/10 : Math.round(r*1000)/1000;
@@ -743,7 +747,7 @@ $('unitGroup').addEventListener('click', e => {
     // Reconvertir los campos de kerf/márgenes para que el valor en mm real no cambie
     ['cfgKerf','cfgMgExt','cfgMgPz'].forEach(id => {
       const el = $(id);
-      const mmVal = (parseFloat(el.value) || 0) * UNIT[oldUnit];
+      const mmVal = (numVal(el.value) || 0) * UNIT[oldUnit];
       let r = mmVal / UNIT[currentUnit];
       r = currentUnit === 'mm' ? Math.round(r * 10) / 10 : Math.round(r * 1000) / 1000;
       el.value = r;
@@ -988,9 +992,9 @@ function getSol(){return ST.res?.sols[ST.solIdx]||null;}
 ===================================================================== */
 function leerCfg(){
   const u=UNIT[currentUnit];
-  ST.cfg.kerf=(parseFloat($('cfgKerf').value)||0)*u;
-  ST.cfg.margenExterior=(parseFloat($('cfgMgExt').value)||0)*u;
-  ST.cfg.margenPiezas=(parseFloat($('cfgMgPz').value)||0)*u;
+  ST.cfg.kerf=(numVal($('cfgKerf').value)||0)*u;
+  ST.cfg.margenExterior=(numVal($('cfgMgExt').value)||0)*u;
+  ST.cfg.margenPiezas=(numVal($('cfgMgPz').value)||0)*u;
   ST.cfg.permitirRotacion=$('cfgRot').checked;
   ST.cfg.prioridad=$('cfgPri').value;
   updateCfgSummary();
@@ -1055,13 +1059,13 @@ function buildPlacaForm(p){
   return `<div class="placa-form" id="placaFormWrap">
     <div class="form-row"><div class="fl" style="grid-column:span 2"><label>Nombre</label><input type="text" id="pfNombre" value="${v.nombre}" placeholder="MDF 18mm"></div></div>
     <div class="form-row">
-      <div class="fl"><label>Largo (${currentUnit})</label><input type="number" id="pfL" value="${v.l}" min="0.01" step="any"></div>
-      <div class="fl"><label>Ancho (${currentUnit})</label><input type="number" id="pfA" value="${v.a}" min="0.01" step="any"></div>
+      <div class="fl"><label>Largo (${currentUnit})</label><input type="text" inputmode="decimal" id="pfL" value="${v.l}"></div>
+      <div class="fl"><label>Ancho (${currentUnit})</label><input type="text" inputmode="decimal" id="pfA" value="${v.a}"></div>
     </div>
     <div class="form-row trio">
       <div class="fl"><label>Stock</label><input type="number" id="pfStock" value="${v.stock}" min="1"></div>
-      <div class="fl"><label>Espesor (${currentUnit})</label><input type="number" id="pfEsp" value="${v.esp}" placeholder="opt." step="any"></div>
-      <div class="fl"><label>Costo ($)</label><input type="number" id="pfCosto" value="${v.costo}" placeholder="opt."></div>
+      <div class="fl"><label>Espesor (${currentUnit})</label><input type="text" inputmode="decimal" id="pfEsp" value="${v.esp}" placeholder="opt."></div>
+      <div class="fl"><label>Costo ($)</label><input type="text" inputmode="decimal" id="pfCosto" value="${v.costo}" placeholder="opt."></div>
     </div>
     <div class="form-acts">
       <button class="btn sm ghost" onclick="cancelPlacaForm()">Cancelar</button>
@@ -1091,11 +1095,11 @@ function cancelPlacaForm(){
 function savePlacaForm(){
   const u=UNIT[currentUnit];
   const nombre=$('pfNombre').value.trim()||'Placa sin nombre';
-  const l=parseFloat($('pfL').value)||1;
-  const a=parseFloat($('pfA').value)||1;
+  const l=numVal($('pfL').value)||1;
+  const a=numVal($('pfA').value)||1;
   const stock=parseInt($('pfStock').value)||1;
-  const esp=parseFloat($('pfEsp').value)||null;
-  const costo=parseFloat($('pfCosto').value)||0;
+  const esp=numVal($('pfEsp').value)||null;
+  const costo=numVal($('pfCosto').value)||0;
   if(editPlacaId==='new'){
     ST.placas.push({id:uid('pl'),nombre,l:l*u,a:a*u,esp:esp?esp*u:null,stock,costo});
     toast('Placa agregada.');
@@ -1214,7 +1218,7 @@ const piezasGrid = (() => {
       if (pip) pip.classList.toggle('on', v);
     } else {
       const raw = el.value;
-      if (colKey === 'l' || colKey === 'a') r[colKey] = toMm(parseFloat(raw)||0);
+      if (colKey === 'l' || colKey === 'a') r[colKey] = toMm(raw);
       else if (colKey === 'cantidad') r[colKey] = Math.max(1, parseInt(raw)||1);
       else r[colKey] = raw;
     }
@@ -1360,8 +1364,8 @@ const piezasGrid = (() => {
         <td class="gtd"><input class="gc gct" data-r="${i}" data-c="codigo" data-ci="0" value="${r.codigo||''}" placeholder="A001" spellcheck="false"></td>
         <td class="gtd"><input class="gc gct" data-r="${i}" data-c="descripcion" data-ci="1" value="${r.descripcion||''}" placeholder="Desc." spellcheck="false" title="${(r.descripcion||'').replace(/"/g,'&quot;')}"></td>
         <td class="gtd"><input class="gc gcn" data-r="${i}" data-c="cantidad" data-ci="2" type="number" value="${r.cantidad||1}" min="1" step="1" style="text-align:center"></td>
-        <td class="gtd"><input class="gc gcn" data-r="${i}" data-c="l" data-ci="3" type="number" value="${lv}" min="0.001" step="any" placeholder="0"></td>
-        <td class="gtd"><input class="gc gcn" data-r="${i}" data-c="a" data-ci="4" type="number" value="${av}" min="0.001" step="any" placeholder="0"></td>
+        <td class="gtd"><input class="gc gcn" data-r="${i}" data-c="l" data-ci="3" type="text" inputmode="decimal" value="${lv}" placeholder="0"></td>
+        <td class="gtd"><input class="gc gcn" data-r="${i}" data-c="a" data-ci="4" type="text" inputmode="decimal" value="${av}" placeholder="0"></td>
         <td class="gtd gchk"><input type="checkbox" class="gchkbox" data-r="${i}" data-c="rotable" data-ci="5" ${r.rotable?'checked':''}></td>
         <td class="gtd gchk"><input type="checkbox" class="gchkbox" data-r="${i}" data-c="vetaFija" data-ci="6" ${r.vetaFija?'checked':''}></td>
         <td class="gtd">
@@ -1474,11 +1478,11 @@ document.addEventListener('click', e => {
 });
 
 $('precioUnitario').addEventListener('input', () => {
-  ST.precioUnitario = Math.max(0, parseFloat($('precioUnitario').value)||0);
+  ST.precioUnitario = Math.max(0, numVal($('precioUnitario').value)||0);
   renderBottomBar();
 });
 $('descuentoPct').addEventListener('input', () => {
-  ST.descuentoPct = Math.min(100, Math.max(0, parseFloat($('descuentoPct').value)||0));
+  ST.descuentoPct = Math.min(100, Math.max(0, numVal($('descuentoPct').value)||0));
   renderBottomBar();
 });
 
@@ -2090,7 +2094,7 @@ window.mbSetP = function(){
 };
 window.mbSetSeccionAncho = function(idx,val){
   if (val === '') { mbState.secciones[idx].anchoManual = false; mbRecomputeAutoWidths(); }
-  else { mbState.secciones[idx].ancho = parseFloat(val); mbState.secciones[idx].anchoManual = true; }
+  else { mbState.secciones[idx].ancho = numVal(val); mbState.secciones[idx].anchoManual = true; }
   renderSeccionesTable();
   renderArmarioDiagram();
 };
@@ -2102,7 +2106,7 @@ window.mbSetSeccionEstantes = function(idx,val){
   renderArmarioDiagram();
 };
 window.mbSetAltura = function(idx,j,val){
-  mbState.secciones[idx].alturas[j] = val===''?0:parseFloat(val);
+  mbState.secciones[idx].alturas[j] = val===''?0:numVal(val);
   renderArmarioDiagram();
 };
 window.renderArmarioExtras = function(){
