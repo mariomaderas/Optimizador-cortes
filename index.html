@@ -136,6 +136,11 @@ input,select,textarea{font-family:inherit;}
 .pb-lbl b{color:var(--text0);font-family:'JetBrains Mono',monospace;}
 .pb-val{font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--text0);}
 .pb-sep{height:1px;background:var(--line2);margin:7px 0;}
+.pb-canto-rates{display:flex;gap:8px;margin:6px 0 2px;}
+.pb-rate{flex:1;display:flex;flex-direction:column;gap:3px;}
+.pb-rate label{font-size:9px;color:var(--text2);font-weight:700;text-transform:uppercase;letter-spacing:.03em;}
+.pb-rate input{width:100%;background:var(--bg3);border:1px solid var(--line2);border-radius:5px;color:var(--text0);padding:5px 6px;font-size:11.5px;font-family:'JetBrains Mono',monospace;text-align:center;}
+.pb-rate input:focus{outline:none;border-color:var(--blue);}
 .pb-row.pb-total{margin-bottom:0;}
 .pb-row.pb-total .pb-lbl{font-weight:800;color:var(--text0);font-size:12px;letter-spacing:.04em;}
 .pb-row.pb-total .pb-val{font-size:15px;color:var(--ok);}
@@ -507,6 +512,20 @@ input,select,textarea{font-family:inherit;}
           <span class="pb-lbl">Piezas <b id="pbPiezasCant">—</b> uds</span>
           <span class="pb-val" id="pbPiezasSub">—</span>
         </div>
+        <div class="pb-row">
+          <span class="pb-lbl">Canto <b id="pbCantoCant">—</b> m</span>
+          <span class="pb-val" id="pbCantoSub">—</span>
+        </div>
+        <div class="pb-canto-rates">
+          <div class="pb-rate">
+            <label>Precio canto $/m</label>
+            <input type="text" inputmode="decimal" id="precioCantoMetro" value="0">
+          </div>
+          <div class="pb-rate">
+            <label>Mano de obra $/m</label>
+            <input type="text" inputmode="decimal" id="manoObraCantoMetro" value="0">
+          </div>
+        </div>
         <div class="pb-sep"></div>
         <div class="pb-row pb-total">
           <span class="pb-lbl">TOTAL</span>
@@ -537,6 +556,10 @@ input,select,textarea{font-family:inherit;}
           <div class="cg">
             <span class="cl">Mg. piezas</span>
             <input type="text" inputmode="decimal" class="ci" id="cfgMgPz" value="0">
+          </div>
+          <div class="cg">
+            <span class="cl" title="Se suma como margen de seguridad extra a los metros de canto recomendados a comprar">Desperdicio % canto</span>
+            <input type="text" inputmode="decimal" class="ci" id="cfgDesp" value="0">
           </div>
           <label class="tog" style="justify-content:space-between;">
             <span class="cl">Rotación auto</span>
@@ -656,6 +679,8 @@ input,select,textarea{font-family:inherit;}
     <div class="bstat"><span class="lbl">Aprovechamiento</span><span class="val ok" id="bAprov">—</span></div>
     <div class="bsep"></div>
     <div class="bstat"><span class="lbl">Cortes</span><span class="val" id="bCortes">—</span></div>
+    <div class="bsep"></div>
+    <div class="bstat"><span class="lbl">Metros canto</span><span class="val" id="bMetrosCanto">—</span></div>
     <div class="bsep"></div>
     <div class="bstat"><span class="lbl">Costo placas</span><span class="val bad" id="bCostoPlacas">—</span></div>
     <div class="bsep"></div>
@@ -789,9 +814,11 @@ $('logoUpload').addEventListener('change', e => {
 const ST = {
   placas: [],
   piezas: [],
-  cfg: { kerf:4, margenExterior:10, margenPiezas:0, permitirRotacion:true, prioridad:'desperdicio' },
+  cfg: { kerf:4, margenExterior:10, margenPiezas:0, permitirRotacion:true, prioridad:'desperdicio', desperdicioPct:0 },
   precioUnitario: 0, // precio de venta aplicado por igual a cada pieza optimizada
   descuentoPct: 0,   // descuento (%) aplicado sobre el precio unitario
+  precioCantoMetro: 0,       // precio del material de tapacanto, por metro lineal
+  manoObraCantoMetro: 0,     // costo de mano de obra de pegado de tapacanto, por metro lineal
   res: null,
   solIdx: 0,
   placaIdx: 0,
@@ -897,21 +924,37 @@ function pack(pzOrd,placas,cfg,h){
 }
 
 function calcMetrics(eps,sin,vel=50){
-  let aT=0,aU=0,lct=0,nc=0;
-  for(const e of eps){aT+=e.aT();aU+=e.aU();nc+=e.cuts.length;for(const c of e.cuts)lct+=c.h-c.d;}
+  let aT=0,aU=0,lct=0,nc=0,mCanto=0;
+  for(const e of eps){
+    aT+=e.aT();aU+=e.aU();nc+=e.cuts.length;
+    for(const c of e.cuts)lct+=c.h-c.d;
+    for(const c of e.col){
+      const tc=c.pz.tapacantos; if(!tc) continue;
+      if(!c.rot){
+        if(tc.sup)mCanto+=c.l; if(tc.inf)mCanto+=c.l;
+        if(tc.izq)mCanto+=c.a; if(tc.der)mCanto+=c.a;
+      }else{
+        if(tc.sup)mCanto+=c.a; if(tc.inf)mCanto+=c.a;
+        if(tc.izq)mCanto+=c.l; if(tc.der)mCanto+=c.l;
+      }
+    }
+  }
   const pA=aT>0?aU/aT*100:0;
-  return{np:eps.length,aT,aU,pA,pD:100-pA,nc,lct,ts:lct/vel,sin:sin.length};
+  return{np:eps.length,aT,aU,pA,pD:100-pA,nc,lct,ts:lct/vel,sin:sin.length,mCanto};
 }
 
-/* Costo de placas usadas (según el $ cargado por placa, sumado por cada instancia física utilizada)
-   y valor de piezas optimizadas (precio unitario único, con descuento %, × cantidad realmente colocada). */
+/* Costo de placas usadas (según el $ cargado por placa, sumado por cada instancia física utilizada),
+   valor de piezas optimizadas (precio unitario único, con descuento %, × cantidad realmente colocada),
+   y costo de canto (metros lineales × (precio del material + mano de obra), por metro). */
 function calcCostos(sol){
-  if(!sol) return {costoPlacas:0,valorPiezas:0,margen:0};
+  if(!sol) return {costoPlacas:0,valorPiezas:0,metrosCanto:0,costoCanto:0,margen:0};
   const costoPlacas=sol.eps.reduce((s,e)=>s+(e.pb.costo||0),0);
   const totColocadas=sol.eps.reduce((s,e)=>s+e.col.length,0);
   const precioNeto=(ST.precioUnitario||0)*(1-(ST.descuentoPct||0)/100);
   const valorPiezas=precioNeto*totColocadas;
-  return {costoPlacas,valorPiezas,margen:valorPiezas-costoPlacas};
+  const metrosCanto=(sol.m.mCanto||0)/1000;
+  const costoCanto=metrosCanto*((ST.precioCantoMetro||0)+(ST.manoObraCantoMetro||0));
+  return {costoPlacas,valorPiezas,metrosCanto,costoCanto,margen:valorPiezas-costoPlacas-costoCanto};
 }
 function fmtMoney(v){return '$'+v.toLocaleString('es-AR',{maximumFractionDigits:0});}
 
@@ -999,6 +1042,7 @@ function leerCfg(){
   ST.cfg.kerf=(numVal($('cfgKerf').value)||0)*u;
   ST.cfg.margenExterior=(numVal($('cfgMgExt').value)||0)*u;
   ST.cfg.margenPiezas=(numVal($('cfgMgPz').value)||0)*u;
+  ST.cfg.desperdicioPct=Math.max(0, numVal($('cfgDesp').value)||0);
   ST.cfg.permitirRotacion=$('cfgRot').checked;
   ST.cfg.prioridad=$('cfgPri').value;
   updateCfgSummary();
@@ -1009,6 +1053,7 @@ function updateCfgSummary(){
 $('cfgKerf').addEventListener('input', () => { leerCfg(); });
 $('cfgMgExt').addEventListener('input', () => { leerCfg(); validarPiezasGrid(); renderBottomBar(); });
 $('cfgMgPz').addEventListener('input', () => { leerCfg(); });
+$('cfgDesp').addEventListener('input', () => { leerCfg(); renderBottomBar(); });
 $('cfgRot').addEventListener('change', () => { leerCfg(); validarPiezasGrid(); renderBottomBar(); });
 $('cfgPri').addEventListener('change', () => { leerCfg(); });
 
@@ -1489,6 +1534,14 @@ $('descuentoPct').addEventListener('input', () => {
   ST.descuentoPct = Math.min(100, Math.max(0, numVal($('descuentoPct').value)||0));
   renderBottomBar();
 });
+$('precioCantoMetro').addEventListener('input', () => {
+  ST.precioCantoMetro = Math.max(0, numVal($('precioCantoMetro').value)||0);
+  renderBottomBar();
+});
+$('manoObraCantoMetro').addEventListener('input', () => {
+  ST.manoObraCantoMetro = Math.max(0, numVal($('manoObraCantoMetro').value)||0);
+  renderBottomBar();
+});
 
 function renderPiezas() { piezasGrid.loadFromST(); }
 function delPieza(id) { ST.piezas=ST.piezas.filter(p=>p.id!==id); renderPiezas(); renderBottomBar(); }
@@ -1533,7 +1586,7 @@ function renderBottomBar(){
   const sol=getSol();
   if(!sol){
     $('bOpt').textContent='—';$('bSinCol').textContent='—';$('bPlacasUsadas').textContent='—';$('bAprov').textContent='—';$('bCortes').textContent='—';
-    $('bCostoPlacas').textContent='—';$('bValorPiezas').textContent='—';
+    $('bCostoPlacas').textContent='—';$('bValorPiezas').textContent='—';$('bMetrosCanto').textContent='—';
     const badge=$('piezasOptBadge');
     badge.textContent='0 optimizadas';badge.classList.remove('warn');
     renderPresupuesto(null);
@@ -1547,6 +1600,12 @@ function renderBottomBar(){
   $('bPlacasUsadas').textContent=m.np;
   $('bAprov').textContent=m.pA.toFixed(1)+'%';
   $('bCortes').textContent=m.nc;
+  const metrosCanto=(m.mCanto||0)/1000;
+  const pctDesp=ST.cfg.desperdicioPct||0;
+  const metrosCantoConDesp=metrosCanto*(1+pctDesp/100);
+  $('bMetrosCanto').textContent=pctDesp>0
+    ? `${metrosCanto.toFixed(1)}m (+${pctDesp}%: ${metrosCantoConDesp.toFixed(1)}m)`
+    : `${metrosCanto.toFixed(1)}m`;
   const costos=calcCostos(sol);
   $('bCostoPlacas').textContent=fmtMoney(costos.costoPlacas);
   $('bValorPiezas').textContent=fmtMoney(costos.valorPiezas);
@@ -1557,11 +1616,12 @@ function renderBottomBar(){
   updateExportGate();
 }
 
-/* Panel de presupuesto (abajo a la izquierda): cantidad × precio parcial de placas y de piezas, + total */
+/* Panel de presupuesto (abajo a la izquierda): cantidad × precio parcial de placas, piezas y canto, + total */
 function renderPresupuesto(info){
   if(!info){
     $('pbPlacasCant').textContent='—'; $('pbPlacasSub').textContent='—';
     $('pbPiezasCant').textContent='—'; $('pbPiezasSub').textContent='—';
+    $('pbCantoCant').textContent='—'; $('pbCantoSub').textContent='—';
     $('pbTotal').textContent='—';
     return;
   }
@@ -1570,7 +1630,9 @@ function renderPresupuesto(info){
   $('pbPlacasSub').textContent=fmtMoney(costos.costoPlacas);
   $('pbPiezasCant').textContent=totColocadas;
   $('pbPiezasSub').textContent=fmtMoney(costos.valorPiezas);
-  $('pbTotal').textContent=fmtMoney(costos.costoPlacas+costos.valorPiezas);
+  $('pbCantoCant').textContent=costos.metrosCanto.toFixed(1);
+  $('pbCantoSub').textContent=fmtMoney(costos.costoCanto);
+  $('pbTotal').textContent=fmtMoney(costos.costoPlacas+costos.valorPiezas+costos.costoCanto);
 }
 
 /* =====================================================================
@@ -1594,7 +1656,7 @@ window.switchMobileTab=switchMobileTab;
 ===================================================================== */
 /* Chequeo previo: si el área total de piezas pedidas ya supera el área total disponible
    en placas (con el stock cargado), es matemáticamente imposible que entren — ni vale la
-   pena correr el algoritmo. Esto es una condición necesaria (no alcanza el área) pero no
+   pena correr el algoritmo. Es una condición necesaria (no alcanza el área) pero no
    suficiente (podría no entrar igual por la geometría del corte guillotinado). */
 function chequearAreaSuficiente(){
   const areaPiezas = ST.piezas.reduce((s,p)=>s+((p.l||0)*(p.a||0)*(p.cantidad||0)),0);
@@ -1735,13 +1797,13 @@ window.optimizarDesdeCuantasEntran = optimizarDesdeCuantasEntran;
 $('btnOpt').onclick=()=>{
   if(!ST.placas.length){toast('Agregá al menos una placa base.','err');return;}
   if(!ST.piezas.length){toast('Agregá al menos una pieza.','err');return;}
+  leerCfg();
   const chk=chequearAreaSuficiente();
   if(!chk.alcanza){
     const faltaM2=((chk.areaPiezas-chk.areaPlacas)/1e6).toFixed(2);
     toast(`Las placas cargadas no alcanzan ni en área: faltan ${faltaM2} m² como mínimo. Agregá más placas o stock antes de optimizar.`,'err');
     return;
   }
-  leerCfg();
   const btn=$('btnOpt');
   btn.disabled=true;btn.textContent='Calculando…';
   setTimeout(()=>{
@@ -2104,15 +2166,16 @@ function rotarPieza(idx){
 
 // Mover pieza con teclas de flecha o botones
 const STEP_MM=10;
-function moverPieza(dx,dy){
-  const sol=getSol(); if(!sol) return;
-  const ep=sol.eps[ST.placaIdx]; if(!ep) return;
-  const i=ST.selPiezaIdx; if(i<0) return;
+function moverPieza(dx,dy,silencioso){
+  const sol=getSol(); if(!sol) return false;
+  const ep=sol.eps[ST.placaIdx]; if(!ep) return false;
+  const i=ST.selPiezaIdx; if(i<0) return false;
   const c=ep.col[i];
   const nx=c.x+dx, ny=c.y+dy;
-  if(nx<ep.me||ny<ep.me||nx+c.l>ep.pb.l||ny+c.a>ep.pb.a){toast('No se puede mover más en esa dirección.','err');return;}
+  if(nx<ep.me||ny<ep.me||nx+c.l>ep.pb.l||ny+c.a>ep.pb.a){ if(!silencioso) toast('No se puede mover más en esa dirección.','err'); return false; }
   c.x=nx; c.y=ny;
   drawCanvas();
+  return true;
 }
 
 $('btnRotar90').onclick=()=>rotarPieza(ST.selPiezaIdx);
@@ -2121,6 +2184,31 @@ $('btnMoverDer').onclick=()=>moverPieza(STEP_MM,0);
 $('btnMoverArr').onclick=()=>moverPieza(0,-STEP_MM);
 $('btnMoverAbj').onclick=()=>moverPieza(0,STEP_MM);
 $('btnDeselecc').onclick=()=>{ST.selPiezaIdx=-1;drawCanvas();};
+
+/* Mover la pieza seleccionada con las flechas del teclado; si se mantiene apretada,
+   sigue moviéndose de forma continua (no depende del repeat nativo del sistema operativo). */
+const ARROW_DELTA = { ArrowLeft:[-STEP_MM,0], ArrowRight:[STEP_MM,0], ArrowUp:[0,-STEP_MM], ArrowDown:[0,STEP_MM] };
+let moveKeyInterval=null, moveKeyActivo=null;
+function detenerMoveRepeat(){ clearInterval(moveKeyInterval); moveKeyInterval=null; moveKeyActivo=null; }
+document.addEventListener('keydown', e=>{
+  const delta = ARROW_DELTA[e.key];
+  if (!delta) return;
+  if (ST.selPiezaIdx < 0 || !getSol()) return; // sin pieza seleccionada, no interferir (deja el resto de atajos normales)
+  const tag = document.activeElement && document.activeElement.tagName;
+  if (tag==='INPUT' || tag==='TEXTAREA' || tag==='SELECT') return; // no interferir con campos de texto
+  e.preventDefault();
+  if (e.repeat) return; // el repetido lo manejamos nosotros con el interval, no con el repeat nativo
+  if (moveKeyActivo === e.key) return;
+  moveKeyActivo = e.key;
+  const paso = () => { if(!moverPieza(delta[0],delta[1],true)) detenerMoveRepeat(); };
+  paso();
+  clearInterval(moveKeyInterval);
+  moveKeyInterval = setInterval(paso, 90);
+});
+document.addEventListener('keyup', e=>{
+  if (ARROW_DELTA[e.key] && e.key===moveKeyActivo) detenerMoveRepeat();
+});
+window.addEventListener('blur', detenerMoveRepeat);
 
 $('btnZIn').onclick=()=>{ST.view.zoom=Math.min(12,ST.view.zoom*1.2);drawCanvas();};
 $('btnZOut').onclick=()=>{ST.view.zoom=Math.max(.01,ST.view.zoom*.83);drawCanvas();};
@@ -2765,6 +2853,12 @@ function exportCSV(){
   rows.push([]);
   rows.push(['Precio unitario',ST.precioUnitario||0]);
   rows.push(['Descuento %',ST.descuentoPct||0]);
+  const metrosCanto=(s.m.mCanto||0)/1000;
+  rows.push(['Metros de canto (m)',metrosCanto.toFixed(1)]);
+  if(ST.cfg.desperdicioPct>0) rows.push(['Metros de canto + desperdicio configurado (m)',(metrosCanto*(1+ST.cfg.desperdicioPct/100)).toFixed(1)]);
+  rows.push(['Precio canto por metro',ST.precioCantoMetro||0]);
+  rows.push(['Mano de obra canto por metro',ST.manoObraCantoMetro||0]);
+  rows.push(['Costo total canto',costos.costoCanto]);
   rows.push(['Costo placas usadas',costos.costoPlacas]);
   rows.push(['Valor piezas optimizadas',costos.valorPiezas]);
   rows.push(['Margen',costos.margen]);
@@ -2778,7 +2872,8 @@ function exportXLS(){
   const rows=[];
   s.eps.forEach(e=>e.col.forEach(c=>{const tc=c.pz.tapacantos;rows.push({'Codigo':c.pz.codigo,'Descripcion':c.pz.descripcion||'','Largo mm':Math.round(c.l),'Ancho mm':Math.round(c.a),'T.Sup':tc.sup?'SI':'NO','T.Inf':tc.inf?'SI':'NO','T.Izq':tc.izq?'SI':'NO','T.Der':tc.der?'SI':'NO','Rotada':c.rot?'SI':'NO','Placa':`${e.pb.nombre} #${e.inst}`});}));
   const costos=calcCostos(s);
-  const res=[{'Metrica':'Placas usadas','Valor':s.m.np},{'Metrica':'Aprovechamiento %','Valor':s.m.pA.toFixed(2)},{'Metrica':'Desperdicio %','Valor':s.m.pD.toFixed(2)},{'Metrica':'Cortes totales','Valor':s.m.nc},{'Metrica':'Longitud corte mm','Valor':Math.round(s.m.lct)},{'Metrica':'Tiempo estimado s','Valor':Math.round(s.m.ts)},{'Metrica':'Piezas sin colocar','Valor':s.m.sin},{'Metrica':'Precio unitario','Valor':ST.precioUnitario||0},{'Metrica':'Descuento %','Valor':ST.descuentoPct||0},{'Metrica':'Costo placas usadas','Valor':costos.costoPlacas},{'Metrica':'Valor piezas optimizadas','Valor':costos.valorPiezas},{'Metrica':'Margen','Valor':costos.margen}];
+  const metrosCantoXls=(s.m.mCanto||0)/1000;
+  const res=[{'Metrica':'Placas usadas','Valor':s.m.np},{'Metrica':'Aprovechamiento %','Valor':s.m.pA.toFixed(2)},{'Metrica':'Desperdicio de material %','Valor':s.m.pD.toFixed(2)},{'Metrica':'Cortes totales','Valor':s.m.nc},{'Metrica':'Longitud corte mm','Valor':Math.round(s.m.lct)},{'Metrica':'Metros de canto','Valor':metrosCantoXls.toFixed(1)},{'Metrica':'Metros de canto + desperdicio configurado','Valor':(metrosCantoXls*(1+(ST.cfg.desperdicioPct||0)/100)).toFixed(1)},{'Metrica':'Precio canto por metro','Valor':ST.precioCantoMetro||0},{'Metrica':'Mano de obra canto por metro','Valor':ST.manoObraCantoMetro||0},{'Metrica':'Costo total canto','Valor':costos.costoCanto},{'Metrica':'Tiempo estimado s','Valor':Math.round(s.m.ts)},{'Metrica':'Piezas sin colocar','Valor':s.m.sin},{'Metrica':'Precio unitario','Valor':ST.precioUnitario||0},{'Metrica':'Descuento %','Valor':ST.descuentoPct||0},{'Metrica':'Costo placas usadas','Valor':costos.costoPlacas},{'Metrica':'Valor piezas optimizadas','Valor':costos.valorPiezas},{'Metrica':'Margen','Valor':costos.margen}];
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows),'Lista de cortes');
   XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(res),'Resumen');
@@ -2925,6 +3020,11 @@ function exportPDF(){
   y+=3;doc.setDrawColor(140,140,140);doc.line(12,y,PW-12,y);y+=5;
   doc.setFont(undefined,'bold');doc.setTextColor(20,20,20);
   doc.text(`Precio unitario: ${fmtMoney(ST.precioUnitario||0)} (-${ST.descuentoPct||0}%)   ·   Costo placas usadas: ${fmtMoney(costos.costoPlacas)}   ·   Valor piezas optimizadas: ${fmtMoney(costos.valorPiezas)}   ·   Margen: ${fmtMoney(costos.margen)}`,12,y);
+  y+=5;
+  const metrosCantoPdf=(s.m.mCanto||0)/1000;
+  const despPdf=ST.cfg.desperdicioPct||0;
+  doc.setFont(undefined,'normal');doc.setTextColor(60,60,60);
+  doc.text(`Metros de canto: ${metrosCantoPdf.toFixed(1)} m${despPdf>0?` (+${despPdf}%: ${(metrosCantoPdf*(1+despPdf/100)).toFixed(1)} m)`:''}   ·   Costo canto (material + mano de obra): ${fmtMoney(costos.costoCanto)}`,12,y);
 
   // Secuencia de cortes (numerada igual que en el plano)
   s.eps.forEach(e=>{
@@ -3113,6 +3213,11 @@ window.ejecutarImpresion=function(){
     y+=3;doc.setDrawColor(140,140,140);doc.line(PAD,y,PW-PAD,y);y+=5;
     doc.setFont(undefined,'bold');doc.setTextColor(20,20,20);
     doc.text(`Precio unitario: ${fmtMoney(ST.precioUnitario||0)} (-${ST.descuentoPct||0}%)   ·   Costo placas usadas: ${fmtMoney(costosImp.costoPlacas)}   ·   Valor piezas optimizadas: ${fmtMoney(costosImp.valorPiezas)}   ·   Margen: ${fmtMoney(costosImp.margen)}`,PAD,y);
+    y+=5;
+    const metrosCantoImp=(s.m.mCanto||0)/1000;
+    const despImp=ST.cfg.desperdicioPct||0;
+    doc.setFont(undefined,'normal');doc.setTextColor(60,60,60);
+    doc.text(`Metros de canto: ${metrosCantoImp.toFixed(1)} m${despImp>0?` (+${despImp}%: ${(metrosCantoImp*(1+despImp/100)).toFixed(1)} m)`:''}   ·   Costo canto: ${fmtMoney(costosImp.costoCanto)}`,PAD,y);
   }
 
   doc.save('plano_de_corte.pdf');
@@ -3131,6 +3236,8 @@ function serializeProject(){
     cfg: ST.cfg,
     precioUnitario: ST.precioUnitario,
     descuentoPct: ST.descuentoPct,
+    precioCantoMetro: ST.precioCantoMetro,
+    manoObraCantoMetro: ST.manoObraCantoMetro,
     currentUnit,
   }, null, 2);
 }
@@ -3139,9 +3246,11 @@ function aplicarProyecto(data){
   if(!data || typeof data !== 'object') throw new Error('Archivo de proyecto inválido.');
   ST.placas = Array.isArray(data.placas) ? data.placas : [];
   ST.piezas = Array.isArray(data.piezas) ? data.piezas : [];
-  ST.cfg = Object.assign({kerf:4,margenExterior:10,margenPiezas:0,permitirRotacion:true,prioridad:'desperdicio'}, data.cfg||{});
+  ST.cfg = Object.assign({kerf:4,margenExterior:10,margenPiezas:0,permitirRotacion:true,prioridad:'desperdicio',desperdicioPct:0}, data.cfg||{});
   ST.precioUnitario = parseFloat(data.precioUnitario)||0;
   ST.descuentoPct = Math.min(100, Math.max(0, parseFloat(data.descuentoPct)||0));
+  ST.precioCantoMetro = parseFloat(data.precioCantoMetro)||0;
+  ST.manoObraCantoMetro = parseFloat(data.manoObraCantoMetro)||0;
   ST.res = null; ST.solIdx = 0; ST.placaIdx = 0; ST.selPiezaIdx = -1;
   if (data.currentUnit && UNIT[data.currentUnit]) {
     currentUnit = data.currentUnit;
@@ -3152,10 +3261,13 @@ function aplicarProyecto(data){
   $('cfgKerf').value = fromMm(ST.cfg.kerf);
   $('cfgMgExt').value = fromMm(ST.cfg.margenExterior);
   $('cfgMgPz').value = fromMm(ST.cfg.margenPiezas);
+  $('cfgDesp').value = ST.cfg.desperdicioPct || 0;
   $('cfgRot').checked = ST.cfg.permitirRotacion !== false;
   $('cfgPri').value = ST.cfg.prioridad || 'desperdicio';
   $('precioUnitario').value = ST.precioUnitario;
   $('descuentoPct').value = ST.descuentoPct;
+  $('precioCantoMetro').value = ST.precioCantoMetro;
+  $('manoObraCantoMetro').value = ST.manoObraCantoMetro;
   updateCfgSummary();
   editPlacaId = null;
   ST.optSignature = null;
