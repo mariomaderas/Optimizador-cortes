@@ -439,6 +439,10 @@ input,select,textarea{font-family:inherit;}
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15" id="themeIconSun" style="display:none;"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
       </button>
       <button class="btn ghost sm" onclick="cargarEjemplo()">Cargar ejemplo</button>
+      <button class="btn ghost sm" onclick="abrirCuantasEntran()" title="Calcular cuántas piezas de una medida entran en una placa, sin tener que optimizar todo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+        ¿Cuántas entran?
+      </button>
       <button class="btn ghost sm" onclick="abrirMuebles()" title="Generar piezas a partir de un mueble básico">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M3 21V8l9-5 9 5v13M3 21h18M9 21V12h6v9"/></svg>
         + Mueble
@@ -806,7 +810,7 @@ class NR { constructor(x,y,l,a){this.x=x;this.y=y;this.l=l;this.a=a;} get area()
 class EP {
   constructor(pb,inst,me) {
     this.pb=pb; this.inst=inst; this.me=me;
-    this.libres=[new NR(me,me,pb.l-me*2,pb.a-me*2)];
+    this.libres=[new NR(me,me,pb.l-me,pb.a-me)];
     this.col=[]; this.cuts=[];
   }
   aT(){return this.pb.l*this.pb.a;}
@@ -876,7 +880,7 @@ function pack(pzOrd,placas,cfg,h){
     for(const ep of eps){const s=findSlot(ep,pz,cfg,h);if(s){place(ep,pz,s,cfg);return true;}}
     const cands=[...placas].filter(p=>(stock.get(p.id)||0)>0).sort((a,b)=>a.l*a.a-b.l*b.a);
     for(const pb of cands){
-      const ul=pb.l-cfg.margenExterior*2,ua=pb.a-cfg.margenExterior*2;
+      const ul=pb.l-cfg.margenExterior,ua=pb.a-cfg.margenExterior;
       const ok=(pz.l<=ul&&pz.a<=ua)||(cfg.permitirRotacion&&pz.rotable&&!pz.vetaFija&&pz.a<=ul&&pz.l<=ua);
       if(ok){
         const inst=eps.filter(e=>e.pb.id===pb.id).length;
@@ -943,7 +947,7 @@ function optimizar(placas,piezas,cfg,n=3){
   if(top&&top.m.sin>0){
     const sinPzs=top.sin;
     const cabeEnAlguna=pz=>placas.some(pb=>{
-      const ul=pb.l-cfg.margenExterior*2,ua=pb.a-cfg.margenExterior*2;
+      const ul=pb.l-cfg.margenExterior,ua=pb.a-cfg.margenExterior;
       return (pz.l<=ul&&pz.a<=ua)||(cfg.permitirRotacion&&pz.rotable&&!pz.vetaFija&&pz.a<=ul&&pz.l<=ua);
     });
     const porStock=sinPzs.filter(cabeEnAlguna).length;
@@ -1502,7 +1506,7 @@ function validarPiezasGrid(){
     const p = ST.piezas[i];
     if (!p || !p.l || !p.a || !ST.placas.length) { tr.classList.remove('row-invalid'); tr.title=''; return; }
     const fits = ST.placas.some(pb => {
-      const ul=pb.l-me*2, ua=pb.a-me*2;
+      const ul=pb.l-me, ua=pb.a-me;
       return (p.l<=ul && p.a<=ua) || (rotOn && p.rotable && !p.vetaFija && p.a<=ul && p.l<=ua);
     });
     tr.classList.toggle('row-invalid', !fits);
@@ -1588,9 +1592,155 @@ window.switchMobileTab=switchMobileTab;
 /* =====================================================================
    OPTIMIZAR
 ===================================================================== */
+/* Chequeo previo: si el área total de piezas pedidas ya supera el área total disponible
+   en placas (con el stock cargado), es matemáticamente imposible que entren — ni vale la
+   pena correr el algoritmo. Esto es una condición necesaria (no alcanza el área) pero no
+   suficiente (podría no entrar igual por la geometría del corte guillotinado). */
+function chequearAreaSuficiente(){
+  const areaPiezas = ST.piezas.reduce((s,p)=>s+((p.l||0)*(p.a||0)*(p.cantidad||0)),0);
+  const areaPlacas = ST.placas.reduce((s,pb)=>s+((pb.l||0)*(pb.a||0)*(pb.stock||0)),0);
+  return { areaPiezas, areaPlacas, alcanza: areaPiezas<=areaPlacas };
+}
+
+/* =====================================================================
+   ¿CUÁNTAS ENTRAN?: calcula, usando el mismo motor de corte real (con kerf,
+   márgenes y rotación), cuántas piezas de una medida entran en una placa —
+   sin tener que cargar la pieza en la grilla y optimizar todo el proyecto.
+===================================================================== */
+function abrirCuantasEntran(){
+  const u = currentUnit;
+  const opcionesPlaca = ST.placas.map((p,i)=>`<option value="${i}">${p.nombre} — ${disp(p.l)}×${disp(p.a)}</option>`).join('');
+  $('modalRoot').innerHTML = `
+    <div class="modal-ov" id="mo" onclick="if(event.target.id==='mo')closeModal()">
+      <div class="modal-box" style="width:440px;">
+        <div class="modal-head"><h3>¿Cuántas entran?</h3><button class="btn icon ghost" onclick="closeModal()" style="font-size:16px">✕</button></div>
+        <div class="modal-body">
+          <div style="font-size:11.5px;color:var(--text2);line-height:1.6;">
+            Elegí una placa cargada (o poné una medida manual) y el tamaño de la pieza. Calcula con el mismo motor real de corte (kerf, márgenes y rotación incluidos), no es una cuenta aproximada.
+          </div>
+          <div class="field">
+            <label>Placa</label>
+            <select id="ceSelPlaca" onchange="renderCuantasEntranManual()">
+              ${opcionesPlaca}
+              <option value="manual">Medida manual…</option>
+            </select>
+          </div>
+          <div id="ceManualWrap" style="display:none;">
+            <div class="frow">
+              <div class="field"><label>Largo placa (${u})</label><input type="text" inputmode="decimal" id="ceManualL" value=""></div>
+              <div class="field"><label>Ancho placa (${u})</label><input type="text" inputmode="decimal" id="ceManualA" value=""></div>
+            </div>
+          </div>
+          <div class="frow">
+            <div class="field"><label>Largo pieza (${u})</label><input type="text" inputmode="decimal" id="cePzL" value="0.3" oninput="calcularCuantasEntranUI()"></div>
+            <div class="field"><label>Ancho pieza (${u})</label><input type="text" inputmode="decimal" id="cePzA" value="0.3" oninput="calcularCuantasEntranUI()"></div>
+          </div>
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:var(--text1);font-weight:600;margin-top:4px;">
+            <input type="checkbox" id="ceRot" checked onchange="calcularCuantasEntranUI()" style="width:auto;"> Permitir rotar la pieza
+          </label>
+          <div id="ceResultado" style="margin-top:14px;padding:14px;background:var(--bg2);border:1px solid var(--line2);border-radius:9px;text-align:center;"></div>
+        </div>
+        <div class="modal-foot">
+          <button class="btn ghost" onclick="closeModal()">Cerrar</button>
+        </div>
+      </div>
+    </div>`;
+  ['ceSelPlaca','ceManualL','ceManualA'].forEach(id=>{
+    const el=$(id); if(el) el.addEventListener('input',calcularCuantasEntranUI);
+  });
+  renderCuantasEntranManual();
+  calcularCuantasEntranUI();
+}
+window.abrirCuantasEntran = abrirCuantasEntran;
+
+function renderCuantasEntranManual(){
+  const esManual = $('ceSelPlaca').value === 'manual';
+  $('ceManualWrap').style.display = esManual ? 'block' : 'none';
+  calcularCuantasEntranUI();
+}
+window.renderCuantasEntranManual = renderCuantasEntranManual;
+
+function calcularCuantasEntranUI(){
+  const resEl = $('ceResultado');
+  const sel = $('ceSelPlaca').value;
+  let placaL, placaA, nombre;
+  if (sel === 'manual') {
+    placaL = toMm($('ceManualL').value);
+    placaA = toMm($('ceManualA').value);
+    nombre = 'la medida indicada';
+    if (!placaL || !placaA) { resEl.innerHTML = '<span style="color:var(--text2)">Ingresá el largo y ancho de la placa.</span>'; return; }
+  } else {
+    const p = ST.placas[parseInt(sel)];
+    if (!p) { resEl.innerHTML = ''; return; }
+    placaL = p.l; placaA = p.a; nombre = p.nombre;
+  }
+  const pzL = toMm($('cePzL').value);
+  const pzA = toMm($('cePzA').value);
+  if (!pzL || !pzA) { resEl.innerHTML = '<span style="color:var(--text2)">Ingresá el largo y ancho de la pieza.</span>'; return; }
+
+  const permitirRot = $('ceRot').checked;
+  leerCfg();
+  const cfgCalc = { ...ST.cfg, permitirRotacion: permitirRot };
+  const piezaDef = { l: pzL, a: pzA, cantidad: 2000, rotable: permitirRot, vetaFija: !permitirRot, tapacantos:{sup:false,inf:false,izq:false,der:false} };
+  const placaCalc = { id:'__ce_calc__', nombre:'calc', l: placaL, a: placaA, stock: 1 };
+
+  let resultado;
+  try {
+    const exp = expand([piezaDef]);
+    const ord = ordenar(exp,'area');
+    resultado = pack(ord, [placaCalc], cfgCalc, 'baf');
+  } catch(e) { resEl.innerHTML = '<span style="color:var(--bad)">No se pudo calcular: '+e.message+'</span>'; return; }
+
+  const ep = resultado.eps[0];
+  const cantidad = ep ? ep.col.length : 0;
+  const aprovech = ep ? (ep.aU()/ep.aT()*100) : 0;
+  window.__ceUltimo = { pzL, pzA, cantidad, permitirRot, esManual: sel==='manual' };
+
+  if (cantidad === 0) {
+    resEl.innerHTML = `<div style="font-size:13px;color:var(--bad);font-weight:700;">La pieza no entra ni una vez en ${nombre==='la medida indicada'?nombre:('"'+nombre+'"')}.</div>`;
+    return;
+  }
+  resEl.innerHTML = `
+    <div style="font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;font-weight:700;margin-bottom:4px;">Entran</div>
+    <div style="font-size:34px;font-weight:900;color:var(--ok);line-height:1;">${cantidad}</div>
+    <div style="font-size:11.5px;color:var(--text2);margin-top:6px;">piezas de ${disp(pzL)} × ${disp(pzA)} en ${nombre==='la medida indicada'?nombre:('"'+nombre+'"')}</div>
+    <div style="font-size:11px;color:var(--text2);margin-top:4px;">Aprovechamiento: <b style="color:var(--text0)">${aprovech.toFixed(1)}%</b></div>
+    <button class="btn primary sm" style="margin-top:12px;width:100%;justify-content:center;" onclick="optimizarDesdeCuantasEntran()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="13" height="13"><path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z"/></svg>
+      Optimizar esta pieza
+    </button>
+  `;
+}
+window.calcularCuantasEntranUI = calcularCuantasEntranUI;
+
+function optimizarDesdeCuantasEntran(){
+  const info = window.__ceUltimo;
+  if (!info || !info.cantidad) return;
+  if (info.esManual) {
+    const placaL = toMm($('ceManualL').value), placaA = toMm($('ceManualA').value);
+    if (!placaL || !placaA) { toast('Ingresá la medida de la placa.','err'); return; }
+    ST.placas.push({ id: uid('pl'), nombre: 'Placa (desde calculadora)', l: placaL, a: placaA, stock: 1, costo: 0 });
+    renderPlacas();
+  }
+  piezasGrid.addRows([{
+    codigo: 'CALC', descripcion: '', l: info.pzL, a: info.pzA, cantidad: info.cantidad,
+    rotable: info.permitirRot, vetaFija: !info.permitirRot,
+    tapacantos: { sup:false, inf:false, izq:false, der:false },
+  }]);
+  closeModal();
+  $('btnOpt').click();
+}
+window.optimizarDesdeCuantasEntran = optimizarDesdeCuantasEntran;
+
 $('btnOpt').onclick=()=>{
   if(!ST.placas.length){toast('Agregá al menos una placa base.','err');return;}
   if(!ST.piezas.length){toast('Agregá al menos una pieza.','err');return;}
+  const chk=chequearAreaSuficiente();
+  if(!chk.alcanza){
+    const faltaM2=((chk.areaPiezas-chk.areaPlacas)/1e6).toFixed(2);
+    toast(`Las placas cargadas no alcanzan ni en área: faltan ${faltaM2} m² como mínimo. Agregá más placas o stock antes de optimizar.`,'err');
+    return;
+  }
   leerCfg();
   const btn=$('btnOpt');
   btn.disabled=true;btn.textContent='Calculando…';
@@ -1947,7 +2097,7 @@ function rotarPieza(idx){
   const nl=c.a, na=c.l;
   const nx=cx-nl/2, ny=cy-na/2;
   // verificar que no salga de la placa
-  if(nx<ep.me||ny<ep.me||nx+nl>ep.pb.l-ep.me||ny+na>ep.pb.a-ep.me){toast('No hay espacio para girar en esa posición.','err');return;}
+  if(nx<ep.me||ny<ep.me||nx+nl>ep.pb.l||ny+na>ep.pb.a){toast('No hay espacio para girar en esa posición.','err');return;}
   c.l=nl; c.a=na; c.x=nx; c.y=ny; c.rot=!c.rot;
   drawCanvas(); toast('Pieza girada 90°.');
 }
@@ -1960,7 +2110,7 @@ function moverPieza(dx,dy){
   const i=ST.selPiezaIdx; if(i<0) return;
   const c=ep.col[i];
   const nx=c.x+dx, ny=c.y+dy;
-  if(nx<ep.me||ny<ep.me||nx+c.l>ep.pb.l-ep.me||ny+c.a>ep.pb.a-ep.me){toast('No se puede mover más en esa dirección.','err');return;}
+  if(nx<ep.me||ny<ep.me||nx+c.l>ep.pb.l||ny+c.a>ep.pb.a){toast('No se puede mover más en esa dirección.','err');return;}
   c.x=nx; c.y=ny;
   drawCanvas();
 }
