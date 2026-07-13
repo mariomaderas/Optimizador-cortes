@@ -125,6 +125,17 @@ input,select,textarea{font-family:inherit;}
 .opt-badge.warn{background:var(--warn);color:#3a2a05;}
 .sp-body{flex:1;overflow-y:auto;padding:10px;}
 
+/* PRECIOS (cuadro unificado, fijo debajo del panel de placas) */
+#preciosBox{
+  flex:none;border-top:2px solid var(--line2);background:var(--bg2);
+  padding:11px 13px 12px;display:flex;flex-direction:column;gap:8px;
+}
+.precio-row-2{display:flex;gap:8px;}
+.precio-row{flex:1;display:flex;flex-direction:column;gap:3px;}
+.precio-row label{font-size:9px;color:var(--text2);font-weight:700;text-transform:uppercase;letter-spacing:.03em;min-height:22px;display:flex;align-items:flex-end;line-height:1.25;}
+.precio-row input{width:100%;background:var(--bg3);border:1px solid var(--line2);border-radius:5px;color:var(--text0);padding:6px 7px;font-size:12px;font-family:'JetBrains Mono',monospace;text-align:center;}
+.precio-row input:focus{outline:none;border-color:var(--blue);}
+
 /* PRESUPUESTO (fijo abajo del panel de placas) */
 #presupuestoBox{
   flex:none;border-top:2px solid var(--blue);background:var(--bg2);
@@ -136,11 +147,6 @@ input,select,textarea{font-family:inherit;}
 .pb-lbl b{color:var(--text0);font-family:'JetBrains Mono',monospace;}
 .pb-val{font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--text0);}
 .pb-sep{height:1px;background:var(--line2);margin:7px 0;}
-.pb-canto-rates{display:flex;gap:8px;margin:6px 0 2px;}
-.pb-rate{flex:1;display:flex;flex-direction:column;gap:3px;}
-.pb-rate label{font-size:9px;color:var(--text2);font-weight:700;text-transform:uppercase;letter-spacing:.03em;}
-.pb-rate input{width:100%;background:var(--bg3);border:1px solid var(--line2);border-radius:5px;color:var(--text0);padding:5px 6px;font-size:11.5px;font-family:'JetBrains Mono',monospace;text-align:center;}
-.pb-rate input:focus{outline:none;border-color:var(--blue);}
 .pb-row.pb-total{margin-bottom:0;}
 .pb-row.pb-total .pb-lbl{font-weight:800;color:var(--text0);font-size:12px;letter-spacing:.04em;}
 .pb-row.pb-total .pb-val{font-size:15px;color:var(--ok);}
@@ -502,6 +508,33 @@ input,select,textarea{font-family:inherit;}
         <button class="btn primary sm" onclick="abrirFormPlaca()">+ Placa</button>
       </div>
       <div class="sp-body" id="placasList"></div>
+      <div id="preciosBox">
+        <div class="pb-title">Precios</div>
+        <div class="precio-row">
+          <label>Precio de placa base ($)</label>
+          <input type="text" inputmode="decimal" id="precioPlacaBase" value="0" onfocus="this.select()" title="Precio unificado aplicado por cada placa física usada, sin importar el tipo">
+        </div>
+        <div class="precio-row-2">
+          <div class="precio-row">
+            <label>Precio pieza cortada ($)</label>
+            <input type="text" inputmode="decimal" id="precioUnitario" value="0" onfocus="this.select()" title="Precio de venta aplicado por igual a cada pieza optimizada">
+          </div>
+          <div class="precio-row" style="max-width:76px;">
+            <label>Desc. pieza (%)</label>
+            <input type="text" inputmode="decimal" id="descuentoPct" value="0" onfocus="this.select()" title="Descuento (%) aplicado sobre el precio unitario">
+          </div>
+        </div>
+        <div class="precio-row-2">
+          <div class="precio-row">
+            <label>Precio canto x mt ($)</label>
+            <input type="text" inputmode="decimal" id="precioCantoMetro" value="0" onfocus="this.select()" title="El % de desperdicio configurado se suma solo a este precio">
+          </div>
+          <div class="precio-row">
+            <label>Mano obra canto x mt ($)</label>
+            <input type="text" inputmode="decimal" id="manoObraCantoMetro" value="0" onfocus="this.select()" title="No se le suma el % de desperdicio: se paga por lo que realmente se instala">
+          </div>
+        </div>
+      </div>
       <div id="presupuestoBox">
         <div class="pb-title">Presupuesto</div>
         <div class="pb-row">
@@ -515,16 +548,6 @@ input,select,textarea{font-family:inherit;}
         <div class="pb-row">
           <span class="pb-lbl">Canto <b id="pbCantoCant">—</b> m</span>
           <span class="pb-val" id="pbCantoSub">—</span>
-        </div>
-        <div class="pb-canto-rates">
-          <div class="pb-rate">
-            <label>Precio canto $/m</label>
-            <input type="text" inputmode="decimal" id="precioCantoMetro" value="0">
-          </div>
-          <div class="pb-rate">
-            <label>Mano de obra $/m</label>
-            <input type="text" inputmode="decimal" id="manoObraCantoMetro" value="0">
-          </div>
         </div>
         <div class="pb-sep"></div>
         <div class="pb-row pb-total">
@@ -546,20 +569,20 @@ input,select,textarea{font-family:inherit;}
         <div id="cfg-bar" onclick="event.stopPropagation()">
           <div class="cg">
             <span class="cl">Kerf</span>
-            <input type="text" inputmode="decimal" class="ci" id="cfgKerf" value="0.004">
+            <input type="text" inputmode="decimal" class="ci" id="cfgKerf" value="0.004" onfocus="this.select()">
             <span style="font-size:10px;color:var(--text2)" id="cfgKerfLbl">mt</span>
           </div>
           <div class="cg">
             <span class="cl">Mg. exterior</span>
-            <input type="text" inputmode="decimal" class="ci" id="cfgMgExt" value="0.01">
+            <input type="text" inputmode="decimal" class="ci" id="cfgMgExt" value="0.01" onfocus="this.select()">
           </div>
           <div class="cg">
             <span class="cl">Mg. piezas</span>
-            <input type="text" inputmode="decimal" class="ci" id="cfgMgPz" value="0">
+            <input type="text" inputmode="decimal" class="ci" id="cfgMgPz" value="0" onfocus="this.select()">
           </div>
           <div class="cg">
             <span class="cl" title="Se suma como margen de seguridad extra a los metros de canto recomendados a comprar">Desperdicio % canto</span>
-            <input type="text" inputmode="decimal" class="ci" id="cfgDesp" value="0">
+            <input type="text" inputmode="decimal" class="ci" id="cfgDesp" value="0" onfocus="this.select()">
           </div>
           <label class="tog" style="justify-content:space-between;">
             <span class="cl">Rotación auto</span>
@@ -641,18 +664,6 @@ input,select,textarea{font-family:inherit;}
     <div class="side-panel right mobile-active" id="panel-right" style="min-width:0;">
       <div class="sp-head">
         <span class="sp-title">Piezas a optimizar <span id="piezasOptBadge" class="opt-badge">0 optimizadas</span></span>
-        <div style="display:flex;flex-direction:column;gap:4px;">
-          <div style="display:flex;align-items:center;gap:6px;">
-            <span style="font-size:9.5px;color:var(--text2);font-weight:700;text-transform:uppercase;width:70px;">Precio unit.</span>
-            <input type="text" inputmode="decimal" id="precioUnitario" value="0" title="Precio de venta aplicado por igual a cada pieza optimizada"
-              style="width:74px;background:var(--bg2);border:1px solid var(--line2);border-radius:5px;color:var(--text0);padding:5px 6px;font-size:12px;font-family:'JetBrains Mono',monospace;text-align:center;">
-          </div>
-          <div style="display:flex;align-items:center;gap:6px;">
-            <span style="font-size:9.5px;color:var(--text2);font-weight:700;text-transform:uppercase;width:70px;">Descuento %</span>
-            <input type="text" inputmode="decimal" id="descuentoPct" value="0" title="Descuento (%) aplicado sobre el precio unitario"
-              style="width:74px;background:var(--bg2);border:1px solid var(--line2);border-radius:5px;color:var(--text0);padding:5px 6px;font-size:12px;font-family:'JetBrains Mono',monospace;text-align:center;">
-          </div>
-        </div>
         <div style="display:flex;gap:5px;align-items:center;">
           <span style="font-size:10px;color:var(--text2);">Enter/Tab para navegar</span>
           <button class="btn sm primary" id="btnAddRow" title="Agregar fila">+ Fila</button>
@@ -815,6 +826,7 @@ const ST = {
   placas: [],
   piezas: [],
   cfg: { kerf:4, margenExterior:10, margenPiezas:0, permitirRotacion:true, prioridad:'desperdicio', desperdicioPct:0 },
+  precioPlacaBase: 0, // precio unificado por cada placa física usada, sin importar el tipo/material
   precioUnitario: 0, // precio de venta aplicado por igual a cada pieza optimizada
   descuentoPct: 0,   // descuento (%) aplicado sobre el precio unitario
   precioCantoMetro: 0,       // precio del material de tapacanto, por metro lineal
@@ -945,16 +957,22 @@ function calcMetrics(eps,sin,vel=50){
 
 /* Costo de placas usadas (según el $ cargado por placa, sumado por cada instancia física utilizada),
    valor de piezas optimizadas (precio unitario único, con descuento %, × cantidad realmente colocada),
-   y costo de canto (metros lineales × (precio del material + mano de obra), por metro). */
+/* Costo de placas usadas (precio de placa base unificado × cantidad de placas físicas usadas),
+   valor de piezas optimizadas (precio unitario único, con descuento %, × cantidad realmente colocada),
+   y costo de canto: el % de desperdicio se aplica solo al material (hay que comprar de más),
+   no a la mano de obra (se paga por lo que realmente se instala). */
 function calcCostos(sol){
-  if(!sol) return {costoPlacas:0,valorPiezas:0,metrosCanto:0,costoCanto:0,margen:0};
-  const costoPlacas=sol.eps.reduce((s,e)=>s+(e.pb.costo||0),0);
+  if(!sol) return {costoPlacas:0,valorPiezas:0,metrosCanto:0,metrosCantoConDesp:0,costoCanto:0,margen:0};
+  const costoPlacas=(ST.precioPlacaBase||0)*sol.eps.length;
   const totColocadas=sol.eps.reduce((s,e)=>s+e.col.length,0);
   const precioNeto=(ST.precioUnitario||0)*(1-(ST.descuentoPct||0)/100);
   const valorPiezas=precioNeto*totColocadas;
   const metrosCanto=(sol.m.mCanto||0)/1000;
-  const costoCanto=metrosCanto*((ST.precioCantoMetro||0)+(ST.manoObraCantoMetro||0));
-  return {costoPlacas,valorPiezas,metrosCanto,costoCanto,margen:valorPiezas-costoPlacas-costoCanto};
+  const metrosCantoConDesp=metrosCanto*(1+(ST.cfg.desperdicioPct||0)/100);
+  const costoCantoMaterial=metrosCantoConDesp*(ST.precioCantoMetro||0);
+  const costoCantoManoObra=metrosCanto*(ST.manoObraCantoMetro||0);
+  const costoCanto=costoCantoMaterial+costoCantoManoObra;
+  return {costoPlacas,valorPiezas,metrosCanto,metrosCantoConDesp,costoCanto,margen:valorPiezas-costoPlacas-costoCanto};
 }
 function fmtMoney(v){return '$'+v.toLocaleString('es-AR',{maximumFractionDigits:0});}
 
@@ -1020,7 +1038,7 @@ function guardarRemanentes(minA=20000){
         id:uid('pl'),
         nombre:`Sobrante ${e.pb.nombre} #${e.inst} (${Math.round(l.l)}×${Math.round(l.a)})`,
         l:Math.round(l.l*10)/10, a:Math.round(l.a*10)/10,
-        esp:e.pb.esp||null, stock:1, costo:0, remanente:true,
+        esp:e.pb.esp||null, stock:1, remanente:true,
       });
     });
   });
@@ -1104,17 +1122,16 @@ function renderPlacas(){
 
 function buildPlacaForm(p){
   const u=UNIT[currentUnit];
-  const v = {nombre:p?.nombre||'',l:p?Math.round(p.l/u*100)/100:2600/u,a:p?Math.round(p.a/u*100)/100:1830/u,esp:p&&p.esp?Math.round(p.esp/u*100)/100:'',stock:p?.stock||1,costo:p?.costo||''};
+  const v = {nombre:p?.nombre||'',l:p?Math.round(p.l/u*100)/100:2600/u,a:p?Math.round(p.a/u*100)/100:1830/u,esp:p&&p.esp?Math.round(p.esp/u*100)/100:'',stock:p?.stock||1};
   return `<div class="placa-form" id="placaFormWrap">
     <div class="form-row"><div class="fl" style="grid-column:span 2"><label>Nombre</label><input type="text" id="pfNombre" value="${v.nombre}" placeholder="MDF 18mm"></div></div>
     <div class="form-row">
       <div class="fl"><label>Largo (${currentUnit})</label><input type="text" inputmode="decimal" id="pfL" value="${v.l}"></div>
       <div class="fl"><label>Ancho (${currentUnit})</label><input type="text" inputmode="decimal" id="pfA" value="${v.a}"></div>
     </div>
-    <div class="form-row trio">
+    <div class="form-row">
       <div class="fl"><label>Stock</label><input type="number" id="pfStock" value="${v.stock}" min="1"></div>
       <div class="fl"><label>Espesor (${currentUnit})</label><input type="text" inputmode="decimal" id="pfEsp" value="${v.esp}" placeholder="opt."></div>
-      <div class="fl"><label>Costo ($)</label><input type="text" inputmode="decimal" id="pfCosto" value="${v.costo}" placeholder="opt."></div>
     </div>
     <div class="form-acts">
       <button class="btn sm ghost" onclick="cancelPlacaForm()">Cancelar</button>
@@ -1148,13 +1165,12 @@ function savePlacaForm(){
   const a=numVal($('pfA').value)||1;
   const stock=parseInt($('pfStock').value)||1;
   const esp=numVal($('pfEsp').value)||null;
-  const costo=numVal($('pfCosto').value)||0;
   if(editPlacaId==='new'){
-    ST.placas.push({id:uid('pl'),nombre,l:l*u,a:a*u,esp:esp?esp*u:null,stock,costo});
+    ST.placas.push({id:uid('pl'),nombre,l:l*u,a:a*u,esp:esp?esp*u:null,stock});
     toast('Placa agregada.');
   } else {
     const idx=ST.placas.findIndex(p=>p.id===editPlacaId);
-    if(idx>=0) ST.placas[idx]={...ST.placas[idx],nombre,l:l*u,a:a*u,esp:esp?esp*u:null,stock,costo};
+    if(idx>=0) ST.placas[idx]={...ST.placas[idx],nombre,l:l*u,a:a*u,esp:esp?esp*u:null,stock};
     toast('Placa actualizada.');
   }
   editPlacaId=null;
@@ -1526,6 +1542,10 @@ document.addEventListener('click', e => {
   if (addBtn) piezasGrid.addRow();
 });
 
+$('precioPlacaBase').addEventListener('input', () => {
+  ST.precioPlacaBase = Math.max(0, numVal($('precioPlacaBase').value)||0);
+  renderBottomBar();
+});
 $('precioUnitario').addEventListener('input', () => {
   ST.precioUnitario = Math.max(0, numVal($('precioUnitario').value)||0);
   renderBottomBar();
@@ -1630,7 +1650,7 @@ function renderPresupuesto(info){
   $('pbPlacasSub').textContent=fmtMoney(costos.costoPlacas);
   $('pbPiezasCant').textContent=totColocadas;
   $('pbPiezasSub').textContent=fmtMoney(costos.valorPiezas);
-  $('pbCantoCant').textContent=costos.metrosCanto.toFixed(1);
+  $('pbCantoCant').textContent=costos.metrosCantoConDesp.toFixed(1);
   $('pbCantoSub').textContent=fmtMoney(costos.costoCanto);
   $('pbTotal').textContent=fmtMoney(costos.costoPlacas+costos.valorPiezas+costos.costoCanto);
 }
@@ -1781,7 +1801,7 @@ function optimizarDesdeCuantasEntran(){
   if (info.esManual) {
     const placaL = toMm($('ceManualL').value), placaA = toMm($('ceManualA').value);
     if (!placaL || !placaA) { toast('Ingresá la medida de la placa.','err'); return; }
-    ST.placas.push({ id: uid('pl'), nombre: 'Placa (desde calculadora)', l: placaL, a: placaA, stock: 1, costo: 0 });
+    ST.placas.push({ id: uid('pl'), nombre: 'Placa (desde calculadora)', l: placaL, a: placaA, stock: 1 });
     renderPlacas();
   }
   piezasGrid.addRows([{
@@ -2238,8 +2258,8 @@ function hideTooltip(){$('tooltip').style.display='none';}
 ===================================================================== */
 function cargarEjemplo(){
   ST.placas=[
-    {id:uid('pl'),nombre:'MDF 18mm 2750x1830',l:2750,a:1830,stock:6,esp:18,costo:45000},
-    {id:uid('pl'),nombre:'Melamina Blanca 18mm',l:2440,a:1830,stock:4,esp:18,costo:52000},
+    {id:uid('pl'),nombre:'MDF 18mm 2750x1830',l:2750,a:1830,stock:6,esp:18},
+    {id:uid('pl'),nombre:'Melamina Blanca 18mm',l:2440,a:1830,stock:4,esp:18},
   ];
   ST.piezas=[
     {id:uid('pz'),codigo:'A001',descripcion:'Lateral mueble',l:720,a:400,cantidad:12,rotable:true,vetaFija:false,tapacantos:{sup:true,inf:true,izq:false,der:false}},
@@ -2248,6 +2268,11 @@ function cargarEjemplo(){
     {id:uid('pz'),codigo:'A004',descripcion:'Fondo mueble',l:1200,a:600,cantidad:6,rotable:true,vetaFija:false,tapacantos:{sup:false,inf:false,izq:false,der:false}},
     {id:uid('pz'),codigo:'A005',descripcion:'Repisa chica',l:300,a:250,cantidad:30,rotable:true,vetaFija:false,tapacantos:{sup:true,inf:false,izq:false,der:false}},
   ];
+  ST.precioPlacaBase=48000; ST.precioUnitario=1500; ST.descuentoPct=0;
+  ST.precioCantoMetro=500; ST.manoObraCantoMetro=200;
+  $('precioPlacaBase').value=ST.precioPlacaBase; $('precioUnitario').value=ST.precioUnitario;
+  $('descuentoPct').value=ST.descuentoPct; $('precioCantoMetro').value=ST.precioCantoMetro;
+  $('manoObraCantoMetro').value=ST.manoObraCantoMetro;
   editPlacaId=null;
   renderPlacas();piezasGrid.loadFromST();renderBottomBar();
   toast('Ejemplo cargado: 2 placas · 5 tipos · 76 unidades. Presioná Optimizar.');
@@ -2851,6 +2876,7 @@ function exportCSV(){
   s.eps.forEach(e=>e.col.forEach(c=>{const tc=c.pz.tapacantos;rows.push([c.pz.codigo,c.pz.descripcion||'',Math.round(c.l),Math.round(c.a),tc.sup?'SI':'NO',tc.inf?'SI':'NO',tc.izq?'SI':'NO',tc.der?'SI':'NO',c.rot?'SI':'NO',`${e.pb.nombre} #${e.inst}`]);}));
   const costos=calcCostos(s);
   rows.push([]);
+  rows.push(['Precio de placa base',ST.precioPlacaBase||0]);
   rows.push(['Precio unitario',ST.precioUnitario||0]);
   rows.push(['Descuento %',ST.descuentoPct||0]);
   const metrosCanto=(s.m.mCanto||0)/1000;
@@ -2873,7 +2899,7 @@ function exportXLS(){
   s.eps.forEach(e=>e.col.forEach(c=>{const tc=c.pz.tapacantos;rows.push({'Codigo':c.pz.codigo,'Descripcion':c.pz.descripcion||'','Largo mm':Math.round(c.l),'Ancho mm':Math.round(c.a),'T.Sup':tc.sup?'SI':'NO','T.Inf':tc.inf?'SI':'NO','T.Izq':tc.izq?'SI':'NO','T.Der':tc.der?'SI':'NO','Rotada':c.rot?'SI':'NO','Placa':`${e.pb.nombre} #${e.inst}`});}));
   const costos=calcCostos(s);
   const metrosCantoXls=(s.m.mCanto||0)/1000;
-  const res=[{'Metrica':'Placas usadas','Valor':s.m.np},{'Metrica':'Aprovechamiento %','Valor':s.m.pA.toFixed(2)},{'Metrica':'Desperdicio de material %','Valor':s.m.pD.toFixed(2)},{'Metrica':'Cortes totales','Valor':s.m.nc},{'Metrica':'Longitud corte mm','Valor':Math.round(s.m.lct)},{'Metrica':'Metros de canto','Valor':metrosCantoXls.toFixed(1)},{'Metrica':'Metros de canto + desperdicio configurado','Valor':(metrosCantoXls*(1+(ST.cfg.desperdicioPct||0)/100)).toFixed(1)},{'Metrica':'Precio canto por metro','Valor':ST.precioCantoMetro||0},{'Metrica':'Mano de obra canto por metro','Valor':ST.manoObraCantoMetro||0},{'Metrica':'Costo total canto','Valor':costos.costoCanto},{'Metrica':'Tiempo estimado s','Valor':Math.round(s.m.ts)},{'Metrica':'Piezas sin colocar','Valor':s.m.sin},{'Metrica':'Precio unitario','Valor':ST.precioUnitario||0},{'Metrica':'Descuento %','Valor':ST.descuentoPct||0},{'Metrica':'Costo placas usadas','Valor':costos.costoPlacas},{'Metrica':'Valor piezas optimizadas','Valor':costos.valorPiezas},{'Metrica':'Margen','Valor':costos.margen}];
+  const res=[{'Metrica':'Placas usadas','Valor':s.m.np},{'Metrica':'Aprovechamiento %','Valor':s.m.pA.toFixed(2)},{'Metrica':'Desperdicio de material %','Valor':s.m.pD.toFixed(2)},{'Metrica':'Cortes totales','Valor':s.m.nc},{'Metrica':'Longitud corte mm','Valor':Math.round(s.m.lct)},{'Metrica':'Metros de canto','Valor':metrosCantoXls.toFixed(1)},{'Metrica':'Metros de canto + desperdicio configurado','Valor':(metrosCantoXls*(1+(ST.cfg.desperdicioPct||0)/100)).toFixed(1)},{'Metrica':'Precio canto por metro','Valor':ST.precioCantoMetro||0},{'Metrica':'Mano de obra canto por metro','Valor':ST.manoObraCantoMetro||0},{'Metrica':'Costo total canto','Valor':costos.costoCanto},{'Metrica':'Tiempo estimado s','Valor':Math.round(s.m.ts)},{'Metrica':'Piezas sin colocar','Valor':s.m.sin},{'Metrica':'Precio de placa base','Valor':ST.precioPlacaBase||0},{'Metrica':'Precio unitario','Valor':ST.precioUnitario||0},{'Metrica':'Descuento %','Valor':ST.descuentoPct||0},{'Metrica':'Costo placas usadas','Valor':costos.costoPlacas},{'Metrica':'Valor piezas optimizadas','Valor':costos.valorPiezas},{'Metrica':'Margen','Valor':costos.margen}];
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows),'Lista de cortes');
   XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(res),'Resumen');
@@ -3234,6 +3260,7 @@ function serializeProject(){
     placas: ST.placas,
     piezas: ST.piezas,
     cfg: ST.cfg,
+    precioPlacaBase: ST.precioPlacaBase,
     precioUnitario: ST.precioUnitario,
     descuentoPct: ST.descuentoPct,
     precioCantoMetro: ST.precioCantoMetro,
@@ -3247,6 +3274,7 @@ function aplicarProyecto(data){
   ST.placas = Array.isArray(data.placas) ? data.placas : [];
   ST.piezas = Array.isArray(data.piezas) ? data.piezas : [];
   ST.cfg = Object.assign({kerf:4,margenExterior:10,margenPiezas:0,permitirRotacion:true,prioridad:'desperdicio',desperdicioPct:0}, data.cfg||{});
+  ST.precioPlacaBase = parseFloat(data.precioPlacaBase)||0;
   ST.precioUnitario = parseFloat(data.precioUnitario)||0;
   ST.descuentoPct = Math.min(100, Math.max(0, parseFloat(data.descuentoPct)||0));
   ST.precioCantoMetro = parseFloat(data.precioCantoMetro)||0;
@@ -3264,6 +3292,7 @@ function aplicarProyecto(data){
   $('cfgDesp').value = ST.cfg.desperdicioPct || 0;
   $('cfgRot').checked = ST.cfg.permitirRotacion !== false;
   $('cfgPri').value = ST.cfg.prioridad || 'desperdicio';
+  $('precioPlacaBase').value = ST.precioPlacaBase;
   $('precioUnitario').value = ST.precioUnitario;
   $('descuentoPct').value = ST.descuentoPct;
   $('precioCantoMetro').value = ST.precioCantoMetro;
