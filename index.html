@@ -588,9 +588,9 @@ input,select,textarea{font-family:inherit;}
             <span class="cl" title="Tamaño de las letras (código de pieza y cotas) en el PDF exportado e impreso">Tamaño letra (PDF)</span>
             <select class="cs" id="cfgFontScale" style="width:100%;">
               <option value="0.75">Chica</option>
-              <option value="1" selected>Normal</option>
+              <option value="1">Normal</option>
               <option value="1.3">Grande</option>
-              <option value="1.6">Muy grande</option>
+              <option value="1.6" selected>Muy grande</option>
             </select>
           </div>
           <label class="tog" style="justify-content:space-between;">
@@ -834,7 +834,7 @@ $('logoUpload').addEventListener('change', e => {
 const ST = {
   placas: [],
   piezas: [],
-  cfg: { kerf:4, margenExterior:10, margenPiezas:0, permitirRotacion:true, prioridad:'desperdicio', desperdicioPct:10, pdfFontScale:1 },
+  cfg: { kerf:4, margenExterior:10, margenPiezas:0, permitirRotacion:true, prioridad:'desperdicio', desperdicioPct:10, pdfFontScale:1.6 },
   precioPlacaBase: 0, // precio unificado por cada placa física usada, sin importar el tipo/material
   precioUnitario: 0, // precio de venta aplicado por igual a cada pieza optimizada
   descuentoPct: 0,   // descuento (%) aplicado sobre el precio unitario
@@ -1973,11 +1973,11 @@ function drawCanvas(){
   ctx.strokeStyle='#4a7cff'; ctx.lineWidth=2;
   ctx.strokeRect(px,py,PL*z,PA*z);
 
-  // Margen exterior (visual guide)
+  // Margen exterior (visual guide) — solo izquierda/arriba, coherente con el motor de corte
   const me=e.me;
   if(me>0&&z>0.05){
     ctx.strokeStyle='#4a7cff33'; ctx.lineWidth=1; ctx.setLineDash([4,4]);
-    ctx.strokeRect(px+me*z,py+me*z,(PL-me*2)*z,(PA-me*2)*z);
+    ctx.strokeRect(px+me*z,py+me*z,(PL-me)*z,(PA-me)*z);
     ctx.setLineDash([]);
   }
 
@@ -1987,6 +1987,23 @@ function drawCanvas(){
     ctx.fillStyle='#4a7cff08'; ctx.fillRect(lx,ly,l.l*z,l.a*z);
     ctx.strokeStyle='#4a7cff22'; ctx.lineWidth=1; ctx.setLineDash([3,4]);
     ctx.strokeRect(lx,ly,l.l*z,l.a*z); ctx.setLineDash([]);
+  });
+
+  // Rastro: si una pieza se movió/giró a mano, marcar su lugar original con línea punteada (ahora es sobrante)
+  e.col.forEach(c=>{
+    if(!c._orig) return;
+    const o=c._orig;
+    if(o.x===c.x && o.y===c.y && o.l===c.l && o.a===c.a) return;
+    const[ox,oy]=w2s(o.x,o.y);
+    ctx.fillStyle='#f8717110'; ctx.fillRect(ox,oy,o.l*z,o.a*z);
+    ctx.strokeStyle='#f87171aa'; ctx.lineWidth=1.3; ctx.setLineDash([5,3]);
+    ctx.strokeRect(ox,oy,o.l*z,o.a*z);
+    ctx.setLineDash([]);
+    if(o.l*z>34 && o.a*z>14){
+      ctx.fillStyle='#f87171cc'; ctx.font=`700 ${Math.min(10,Math.max(8,9*z))}px Inter,sans-serif`;
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText('sobrante',ox+o.l*z/2,oy+o.a*z/2);
+    }
   });
 
   // Piezas colocadas
@@ -2025,8 +2042,8 @@ function drawCanvas(){
       const drawArrow=(edge,color)=>{
         ctx.fillStyle=color; ctx.strokeStyle='#00000088'; ctx.lineWidth=.6;
         ctx.beginPath();
-        if(edge==='top'){const mx=cx+cw*.28,tipY=cy+gap,baseY=tipY+asz*1.6;ctx.moveTo(mx-asz,baseY);ctx.lineTo(mx+asz,baseY);ctx.lineTo(mx,tipY);}
-        else if(edge==='bottom'){const mx=cx+cw*.72,tipY=cy+ch-gap,baseY=tipY-asz*1.6;ctx.moveTo(mx-asz,baseY);ctx.lineTo(mx+asz,baseY);ctx.lineTo(mx,tipY);}
+        if(edge==='top'){const mx=cx+cw*.72,tipY=cy+gap,baseY=tipY+asz*1.6;ctx.moveTo(mx-asz,baseY);ctx.lineTo(mx+asz,baseY);ctx.lineTo(mx,tipY);}
+        else if(edge==='bottom'){const mx=cx+cw*.28,tipY=cy+ch-gap,baseY=tipY-asz*1.6;ctx.moveTo(mx-asz,baseY);ctx.lineTo(mx+asz,baseY);ctx.lineTo(mx,tipY);}
         else if(edge==='left'){const my=cy+ch*.28,tipX=cx+gap,baseX=tipX+asz*1.6;ctx.moveTo(baseX,my-asz);ctx.lineTo(baseX,my+asz);ctx.lineTo(tipX,my);}
         else{const my=cy+ch*.72,tipX=cx+cw-gap,baseX=tipX-asz*1.6;ctx.moveTo(baseX,my-asz);ctx.lineTo(baseX,my+asz);ctx.lineTo(tipX,my);}
         ctx.closePath(); ctx.fill(); ctx.stroke();
@@ -2186,6 +2203,7 @@ function rotarPieza(idx){
   const ep=sol.eps[ST.placaIdx]; if(!ep) return;
   const c=ep.col[idx];
   if(c.pz.vetaFija){toast('Pieza con veta fija: no se puede girar.','err');return;}
+  if(!c._orig) c._orig={x:c.x,y:c.y,l:c.l,a:c.a};
   const cx=c.x+c.l/2, cy=c.y+c.a/2;
   const nl=c.a, na=c.l;
   const nx=cx-nl/2, ny=cy-na/2;
@@ -2204,6 +2222,7 @@ function moverPieza(dx,dy,silencioso){
   const c=ep.col[i];
   const nx=c.x+dx, ny=c.y+dy;
   if(nx<ep.me||ny<ep.me||nx+c.l>ep.pb.l||ny+c.a>ep.pb.a){ if(!silencioso) toast('No se puede mover más en esa dirección.','err'); return false; }
+  if(!c._orig) c._orig={x:c.x,y:c.y,l:c.l,a:c.a};
   c.x=nx; c.y=ny;
   drawCanvas();
   return true;
@@ -2937,15 +2956,19 @@ function pdfHatchRect(doc,x,y,w,h,spacing){
    lenVal/widVal ya vienen convertidos a la unidad activa por el llamador. */
 function pdfDimLabels(doc,x,y,w,h,lenLabel,widLabel){
   const esc=(ST.cfg&&ST.cfg.pdfFontScale)||1;
+  const fs=Math.max(2,Math.min(7,Math.min(w,h)*.25))*esc;
   doc.setTextColor(70,70,70);
   doc.setFont(undefined,'bold');
-  if(w>2){
-    doc.setFontSize(Math.max(3,Math.min(7,Math.min(w,h)*.25))*esc);
-    doc.text(lenLabel,x+w*.18,y+Math.min(3.6,h*.4),{align:'center'});
+  doc.setFontSize(fs);
+  // Centradas según el tamaño de la pieza (no pegadas a una esquina), con separación al borde
+  // que se achica sola en piezas finitas para que la cota nunca se salteé ni se salga de la pieza.
+  if(w>0.8){
+    const clrY=Math.min(fs*0.85,h*0.32);
+    doc.text(lenLabel,x+w/2,y+Math.max(clrY,0.9),{align:'center'});
   }
-  if(h>2){
-    doc.setFontSize(Math.max(3,Math.min(7,Math.min(w,h)*.25))*esc);
-    doc.text(widLabel,x+Math.min(3.6,w*.4),y+h*.82,{align:'center',angle:90});
+  if(h>0.8){
+    const clrX=Math.min(fs*0.85,w*0.32);
+    doc.text(widLabel,x+Math.max(clrX,0.9),y+h/2,{align:'center',angle:90});
   }
   doc.setFont(undefined,'normal');
 }
@@ -2973,20 +2996,45 @@ function pdfCutNumbers(doc,ox,oy,sc,cuts,r){
   });
 }
 
-/* Dibuja una pequeña flecha (triángulo) apuntando HACIA el lateral con tapacanto,
-   bien separada del borde y corrida del punto medio (donde caen los círculos de secuencia de corte).
-   Chica por defecto, y se achica más todavía en piezas finitas. */
-function pdfEdgeArrow(doc,x,y,w,h,edge,color){
-  if(w<1||h<1) return;
-  const s=Math.min(1.4,Math.max(.3,Math.min(w,h)*.11));
-  const gap=Math.min(3,Math.max(.5,Math.min(w,h)*.14));
-  doc.setFillColor(...color);doc.setDrawColor(60,60,60);doc.setLineWidth(.08);
-  let x1,y1,x2,y2,x3,y3;
-  if(edge==='top'){const mx=x+w*.28,tipY=y+gap,baseY=tipY+s*1.6;x1=mx-s;y1=baseY;x2=mx+s;y2=baseY;x3=mx;y3=tipY;}
-  else if(edge==='bot'){const mx=x+w*.72,tipY=y+h-gap,baseY=tipY-s*1.6;x1=mx-s;y1=baseY;x2=mx+s;y2=baseY;x3=mx;y3=tipY;}
-  else if(edge==='lft'){const my=y+h*.28,tipX=x+gap,baseX=tipX+s*1.6;x1=baseX;y1=my-s;x2=baseX;y2=my+s;x3=tipX;y3=my;}
-  else{const my=y+h*.72,tipX=x+w-gap,baseX=tipX-s*1.6;x1=baseX;y1=my-s;x2=baseX;y2=my+s;x3=tipX;y3=my;}
-  doc.triangle(x1,y1,x2,y2,x3,y3,'FD');
+/* Insignia central de la pieza: el código va ADENTRO de un recuadro hecho a medida del propio
+   texto, y las flechas de tapacanto (solo las de los lados realmente activos) apuntan hacia
+   afuera desde ese mismo recuadro — código y tapacanto quedan fundidos en un único elemento,
+   sin competir con las cotas de medida (que ahora quedan centradas en cada borde). */
+function pdfCodeBadge(doc,cx,cy,w,h,codigo,sd,colors){
+  const fs=pdfCodigoFontSize(w,h);
+  doc.setFont(undefined,'normal');doc.setFontSize(fs);
+  const textW=doc.getTextWidth(codigo);
+  const padX=fs*0.32, padY=fs*0.28;
+  const boxW=Math.max(textW+padX*2, fs*1.1), boxH=fs*0.72+padY*2;
+  doc.setDrawColor(170,170,170);doc.setLineWidth(.1);doc.setFillColor(255,255,255);
+  doc.rect(cx-boxW/2,cy-boxH/2,boxW,boxH,'FD');
+  doc.setTextColor(30,30,30);
+  doc.text(codigo,cx,cy,{align:'center',baseline:'middle'});
+  if(!(sd.top||sd.bot||sd.lft||sd.rgt)) return;
+  const s=Math.max(.7,Math.min(1.6,Math.min(w,h)*.08));
+  const gapY=boxH/2+s*1.5, gapX=boxW/2+s*1.5;
+  doc.setLineWidth(.08);
+  const tri=(x1,y1,x2,y2,x3,y3,color)=>{doc.setFillColor(...color);doc.setDrawColor(60,60,60);doc.triangle(x1,y1,x2,y2,x3,y3,'FD');};
+  if(sd.top) tri(cx-s,cy-gapY+s*.5,cx+s,cy-gapY+s*.5,cx,cy-gapY-s*.7,colors.top);
+  if(sd.bot) tri(cx-s,cy+gapY-s*.5,cx+s,cy+gapY-s*.5,cx,cy+gapY+s*.7,colors.bot);
+  if(sd.lft) tri(cx-gapX+s*.5,cy-s,cx-gapX+s*.5,cy+s,cx-gapX-s*.7,cy,colors.lft);
+  if(sd.rgt) tri(cx+gapX-s*.5,cy-s,cx+gapX-s*.5,cy+s,cx+gapX+s*.7,cy,colors.rgt);
+}
+
+/* Widget de tapacanto solo (sin código): para piezas demasiado chicas como para mostrar
+   el código legible, se muestra únicamente el cuadradito con las flechas activas. */
+function pdfTapacantoWidget(doc,cx,cy,w,h,sd,colors){
+  if(!(sd.top||sd.bot||sd.lft||sd.rgt)) return;
+  const sq=Math.max(1.1,Math.min(2.6,Math.min(w,h)*.12));
+  const half=sq/2, s=sq*.4, gap=half+sq*.6;
+  doc.setDrawColor(170,170,170);doc.setLineWidth(.1);doc.setFillColor(255,255,255);
+  doc.rect(cx-half,cy-half,sq,sq,'FD');
+  doc.setLineWidth(.08);
+  const tri=(x1,y1,x2,y2,x3,y3,color)=>{doc.setFillColor(...color);doc.setDrawColor(60,60,60);doc.triangle(x1,y1,x2,y2,x3,y3,'FD');};
+  if(sd.top) tri(cx-s,cy-gap+s*.4,cx+s,cy-gap+s*.4,cx,cy-gap-s*.6,colors.top);
+  if(sd.bot) tri(cx-s,cy+gap-s*.4,cx+s,cy+gap-s*.4,cx,cy+gap+s*.6,colors.bot);
+  if(sd.lft) tri(cx-gap+s*.4,cy-s,cx-gap+s*.4,cy+s,cx-gap-s*.6,cy,colors.lft);
+  if(sd.rgt) tri(cx+gap-s*.4,cy-s,cx+gap-s*.4,cy+s,cx+gap+s*.6,cy,colors.rgt);
 }
 
 /* Logo de marca (negro) en la esquina superior izquierda de cada página del PDF */
@@ -3013,19 +3061,16 @@ function exportPDF(){
     // Placa: fondo blanco, contorno sólido
     doc.setFillColor(255,255,255);doc.setDrawColor(20,20,20);doc.setLineWidth(.4);
     doc.rect(ox,oy,e.pb.l*sc,e.pb.a*sc,'FD');
-    // Sobrantes: relleno con trama diagonal punteada (no gasta tinta) + cota de medidas
+    // PASADA 1: formas (sobrantes, piezas, líneas de tapacanto, cortes, círculos numerados)
     e.libres.forEach(l=>{
       const x=ox+l.x*sc,y=oy+l.y*sc,w=l.l*sc,h=l.a*sc;
       pdfHatchRect(doc,x,y,w,h);
       doc.setDrawColor(120,120,120);doc.setLineWidth(.15);doc.rect(x,y,w,h,'D');
-      pdfDimLabels(doc,x,y,w,h,String(fromMm(l.l)),String(fromMm(l.a)));
     });
     e.col.forEach(c=>{
       const x=ox+c.x*sc,y=oy+c.y*sc,w=c.l*sc,h=c.a*sc;
       // Piezas útiles: fondo blanco, contorno sólido negro fino
       doc.setFillColor(255,255,255);doc.setDrawColor(20,20,20);doc.setLineWidth(.3);doc.rect(x,y,w,h,'FD');
-      pdfDimLabels(doc,x,y,w,h,String(fromMm(c.l)),String(fromMm(c.a)));
-      if(w>16&&h>12){doc.setFontSize(pdfCodigoFontSize(w,h));doc.setFont(undefined,'normal');doc.setTextColor(30,30,30);doc.text(c.pz.codigo,x+w/2,y+h/2,{align:'center',baseline:'middle'});}
       const tc=c.pz.tapacantos;const sd=c.rot?{top:tc.izq,bot:tc.der,lft:tc.inf,rgt:tc.sup}:{top:tc.sup,bot:tc.inf,lft:tc.izq,rgt:tc.der};
       doc.setLineWidth(.7);
       if(sd.top){doc.setDrawColor(61,214,140);doc.line(x,y,x+w,y);}
@@ -3033,10 +3078,6 @@ function exportPDF(){
       if(sd.lft){doc.setDrawColor(251,191,36);doc.line(x,y,x,y+h);}
       if(sd.rgt){doc.setDrawColor(248,113,113);doc.line(x+w,y,x+w,y+h);}
       doc.setLineWidth(.2);
-      if(sd.top) pdfEdgeArrow(doc,x,y,w,h,'top',[61,214,140]);
-      if(sd.bot) pdfEdgeArrow(doc,x,y,w,h,'bot',[96,165,250]);
-      if(sd.lft) pdfEdgeArrow(doc,x,y,w,h,'lft',[251,191,36]);
-      if(sd.rgt) pdfEdgeArrow(doc,x,y,w,h,'rgt',[248,113,113]);
     });
     // Líneas de corte (grilla completa, guía para el operario)
     doc.setDrawColor(20,20,20);doc.setLineWidth(.25);
@@ -3044,7 +3085,23 @@ function exportPDF(){
       if(cu.t==='V')doc.line(ox+cu.pos*sc,oy+cu.d*sc,ox+cu.pos*sc,oy+cu.h*sc);
       else doc.line(ox+cu.d*sc,oy+cu.pos*sc,ox+cu.h*sc,oy+cu.pos*sc);
     });
-    pdfCutNumbers(doc,ox,oy,sc,e.cuts,2.6);
+    // PASADA 2: todo el texto, siempre encima (cotas, código, flechas de canto) — así ninguna
+    // línea de corte puede taparlo
+    e.libres.forEach(l=>{
+      const x=ox+l.x*sc,y=oy+l.y*sc,w=l.l*sc,h=l.a*sc;
+      pdfDimLabels(doc,x,y,w,h,String(fromMm(l.l)),String(fromMm(l.a)));
+    });
+    e.col.forEach(c=>{
+      const x=ox+c.x*sc,y=oy+c.y*sc,w=c.l*sc,h=c.a*sc;
+      pdfDimLabels(doc,x,y,w,h,String(fromMm(c.l)),String(fromMm(c.a)));
+      const tc=c.pz.tapacantos;const sd=c.rot?{top:tc.izq,bot:tc.der,lft:tc.inf,rgt:tc.sup}:{top:tc.sup,bot:tc.inf,lft:tc.izq,rgt:tc.der};
+      const colors={top:[61,214,140],bot:[96,165,250],lft:[251,191,36],rgt:[248,113,113]};
+      if(w>16&&h>12){
+        pdfCodeBadge(doc,x+w/2,y+h/2,w,h,c.pz.codigo,sd,colors);
+      } else {
+        pdfTapacantoWidget(doc,x+w/2,y+h/2,w,h,sd,colors);
+      }
+    });
   });
   // Lista
   doc.addPage();
@@ -3198,12 +3255,11 @@ window.ejecutarImpresion=function(){
     doc.setFillColor(255,255,255);doc.setDrawColor(20,20,20);doc.setLineWidth(.35);
     doc.rect(planX,planY,e.pb.l*sc,e.pb.a*sc,'FD');
 
-    // Sobrantes: trama diagonal punteada + cota
+    // PASADA 1: formas
     e.libres.forEach(l=>{
       const x=planX+l.x*sc,y=planY+l.y*sc,w=l.l*sc,h=l.a*sc;
       pdfHatchRect(doc,x,y,w,h);
       doc.setDrawColor(120,120,120);doc.setLineWidth(.12);doc.rect(x,y,w,h,'D');
-      pdfDimLabels(doc,x,y,w,h,String(fromMm(l.l)),String(fromMm(l.a)));
     });
 
     e.col.forEach(c=>{
@@ -3211,8 +3267,6 @@ window.ejecutarImpresion=function(){
       // Piezas útiles: fondo blanco, contorno sólido
       doc.setFillColor(255,255,255);doc.setDrawColor(20,20,20);doc.setLineWidth(.25);
       doc.rect(x,y,w,h,'FD');
-      pdfDimLabels(doc,x,y,w,h,String(fromMm(c.l)),String(fromMm(c.a)));
-      if(w>10&&h>8){doc.setFontSize(pdfCodigoFontSize(w,h));doc.setFont(undefined,'normal');doc.setTextColor(30,30,30);doc.text(c.pz.codigo,x+w/2,y+h/2,{align:'center',baseline:'middle'});}
       const tc=c.pz.tapacantos;const sd=c.rot?{top:tc.izq,bot:tc.der,lft:tc.inf,rgt:tc.sup}:{top:tc.sup,bot:tc.inf,lft:tc.izq,rgt:tc.der};
       doc.setLineWidth(.5);
       if(sd.top){doc.setDrawColor(61,214,140);doc.line(x,y,x+w,y);}
@@ -3220,10 +3274,6 @@ window.ejecutarImpresion=function(){
       if(sd.lft){doc.setDrawColor(251,191,36);doc.line(x,y,x,y+h);}
       if(sd.rgt){doc.setDrawColor(248,113,113);doc.line(x+w,y,x+w,y+h);}
       doc.setLineWidth(.2);
-      if(sd.top) pdfEdgeArrow(doc,x,y,w,h,'top',[61,214,140]);
-      if(sd.bot) pdfEdgeArrow(doc,x,y,w,h,'bot',[96,165,250]);
-      if(sd.lft) pdfEdgeArrow(doc,x,y,w,h,'lft',[251,191,36]);
-      if(sd.rgt) pdfEdgeArrow(doc,x,y,w,h,'rgt',[248,113,113]);
     });
     // Líneas de corte (grilla completa, guía para el operario)
     doc.setDrawColor(20,20,20);doc.setLineWidth(.2);
@@ -3231,8 +3281,23 @@ window.ejecutarImpresion=function(){
       if(cu.t==='V')doc.line(planX+cu.pos*sc,planY+cu.d*sc,planX+cu.pos*sc,planY+cu.h*sc);
       else doc.line(planX+cu.d*sc,planY+cu.pos*sc,planX+cu.h*sc,planY+cu.pos*sc);
     });
-    const numR = n<=1?2.6:(n===2?1.8:(n===3?1.3:1.05));
-    pdfCutNumbers(doc,planX,planY,sc,e.cuts,numR);
+
+    // PASADA 2: todo el texto, siempre encima
+    e.libres.forEach(l=>{
+      const x=planX+l.x*sc,y=planY+l.y*sc,w=l.l*sc,h=l.a*sc;
+      pdfDimLabels(doc,x,y,w,h,String(fromMm(l.l)),String(fromMm(l.a)));
+    });
+    e.col.forEach(c=>{
+      const x=planX+c.x*sc,y=planY+c.y*sc,w=c.l*sc,h=c.a*sc;
+      pdfDimLabels(doc,x,y,w,h,String(fromMm(c.l)),String(fromMm(c.a)));
+      const tc=c.pz.tapacantos;const sd=c.rot?{top:tc.izq,bot:tc.der,lft:tc.inf,rgt:tc.sup}:{top:tc.sup,bot:tc.inf,lft:tc.izq,rgt:tc.der};
+      const colors={top:[61,214,140],bot:[96,165,250],lft:[251,191,36],rgt:[248,113,113]};
+      if(w>10&&h>8){
+        pdfCodeBadge(doc,x+w/2,y+h/2,w,h,c.pz.codigo,sd,colors);
+      } else {
+        pdfTapacantoWidget(doc,x+w/2,y+h/2,w,h,sd,colors);
+      }
+    });
   });
 
   // Lista de cortes al final (opcional, según el tilde "Imprimir reporte de medidas")
@@ -3293,7 +3358,7 @@ function aplicarProyecto(data){
   if(!data || typeof data !== 'object') throw new Error('Archivo de proyecto inválido.');
   ST.placas = Array.isArray(data.placas) ? data.placas : [];
   ST.piezas = Array.isArray(data.piezas) ? data.piezas : [];
-  ST.cfg = Object.assign({kerf:4,margenExterior:10,margenPiezas:0,permitirRotacion:true,prioridad:'desperdicio',desperdicioPct:10,pdfFontScale:1}, data.cfg||{});
+  ST.cfg = Object.assign({kerf:4,margenExterior:10,margenPiezas:0,permitirRotacion:true,prioridad:'desperdicio',desperdicioPct:10,pdfFontScale:1.6}, data.cfg||{});
   ST.precioPlacaBase = parseFloat(data.precioPlacaBase)||0;
   ST.precioUnitario = parseFloat(data.precioUnitario)||0;
   ST.descuentoPct = Math.min(100, Math.max(0, parseFloat(data.descuentoPct)||0));
