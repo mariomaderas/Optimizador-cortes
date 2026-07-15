@@ -2956,19 +2956,23 @@ function pdfHatchRect(doc,x,y,w,h,spacing){
    lenVal/widVal ya vienen convertidos a la unidad activa por el llamador. */
 function pdfDimLabels(doc,x,y,w,h,lenLabel,widLabel){
   const esc=(ST.cfg&&ST.cfg.pdfFontScale)||1;
-  const fs=Math.max(2,Math.min(7,Math.min(w,h)*.25))*esc;
+  const m=Math.min(w,h);
+  // El escalado de Configuración nunca puede hacer que la letra supere ~26% del lado más
+  // chico de la pieza: así "Muy grande" no se desborda ni empuja la cota hacia el centro
+  // (donde está el cuadradito de código/tapacanto).
+  const fs=Math.max(2,Math.min(7*esc,m*.26));
   doc.setTextColor(70,70,70);
   doc.setFont(undefined,'bold');
   doc.setFontSize(fs);
-  // Centradas según el tamaño de la pieza (no pegadas a una esquina), con separación al borde
-  // que se achica sola en piezas finitas para que la cota nunca se salteé ni se salga de la pieza.
+  // Pegadas cerca del borde (no corridas hacia el centro), para no competir nunca con el
+  // cuadradito central de código/tapacanto.
   if(w>0.8){
-    const clrY=Math.min(fs*0.85,h*0.32);
-    doc.text(lenLabel,x+w/2,y+Math.max(clrY,0.9),{align:'center'});
+    const clrY=Math.min(fs*0.8,h*0.16);
+    doc.text(lenLabel,x+w/2,y+Math.max(clrY,0.8),{align:'center'});
   }
   if(h>0.8){
-    const clrX=Math.min(fs*0.85,w*0.32);
-    doc.text(widLabel,x+Math.max(clrX,0.9),y+h/2,{align:'center',angle:90});
+    const clrX=Math.min(fs*0.8,w*0.16);
+    doc.text(widLabel,x+Math.max(clrX,0.8),y+h/2,{align:'center',angle:90});
   }
   doc.setFont(undefined,'normal');
 }
@@ -2976,7 +2980,8 @@ function pdfDimLabels(doc,x,y,w,h,lenLabel,widLabel){
 /* Tamaño de fuente para el código de la pieza (ahora chico, como tenían antes las cotas) */
 function pdfCodigoFontSize(w,h){
   const esc=(ST.cfg&&ST.cfg.pdfFontScale)||1;
-  return Math.max(2.4,Math.min(6.5,Math.min(w,h)*.09))*esc;
+  const m=Math.min(w,h);
+  return Math.max(2.2,Math.min(6.5*esc,m*.13));
 }
 
 /* Dibuja círculos numerados en el punto medio de cada línea de corte, en el orden de e.cuts,
@@ -3025,7 +3030,7 @@ function pdfCodeBadge(doc,cx,cy,w,h,codigo,sd,colors){
    el código legible, se muestra únicamente el cuadradito con las flechas activas. */
 function pdfTapacantoWidget(doc,cx,cy,w,h,sd,colors){
   if(!(sd.top||sd.bot||sd.lft||sd.rgt)) return;
-  const sq=Math.max(1.1,Math.min(2.6,Math.min(w,h)*.12));
+  const sq=Math.max(1.1,Math.min(2.4,Math.min(w,h)*.10));
   const half=sq/2, s=sq*.4, gap=half+sq*.6;
   doc.setDrawColor(170,170,170);doc.setLineWidth(.1);doc.setFillColor(255,255,255);
   doc.rect(cx-half,cy-half,sq,sq,'FD');
@@ -3093,7 +3098,6 @@ function exportPDF(){
     });
     e.col.forEach(c=>{
       const x=ox+c.x*sc,y=oy+c.y*sc,w=c.l*sc,h=c.a*sc;
-      pdfDimLabels(doc,x,y,w,h,String(fromMm(c.l)),String(fromMm(c.a)));
       const tc=c.pz.tapacantos;const sd=c.rot?{top:tc.izq,bot:tc.der,lft:tc.inf,rgt:tc.sup}:{top:tc.sup,bot:tc.inf,lft:tc.izq,rgt:tc.der};
       const colors={top:[61,214,140],bot:[96,165,250],lft:[251,191,36],rgt:[248,113,113]};
       if(w>16&&h>12){
@@ -3101,6 +3105,7 @@ function exportPDF(){
       } else {
         pdfTapacantoWidget(doc,x+w/2,y+h/2,w,h,sd,colors);
       }
+      pdfDimLabels(doc,x,y,w,h,String(fromMm(c.l)),String(fromMm(c.a)));
     });
   });
   // Lista
@@ -3289,7 +3294,6 @@ window.ejecutarImpresion=function(){
     });
     e.col.forEach(c=>{
       const x=planX+c.x*sc,y=planY+c.y*sc,w=c.l*sc,h=c.a*sc;
-      pdfDimLabels(doc,x,y,w,h,String(fromMm(c.l)),String(fromMm(c.a)));
       const tc=c.pz.tapacantos;const sd=c.rot?{top:tc.izq,bot:tc.der,lft:tc.inf,rgt:tc.sup}:{top:tc.sup,bot:tc.inf,lft:tc.izq,rgt:tc.der};
       const colors={top:[61,214,140],bot:[96,165,250],lft:[251,191,36],rgt:[248,113,113]};
       if(w>10&&h>8){
@@ -3297,6 +3301,7 @@ window.ejecutarImpresion=function(){
       } else {
         pdfTapacantoWidget(doc,x+w/2,y+h/2,w,h,sd,colors);
       }
+      pdfDimLabels(doc,x,y,w,h,String(fromMm(c.l)),String(fromMm(c.a)));
     });
   });
 
