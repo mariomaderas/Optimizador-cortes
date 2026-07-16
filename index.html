@@ -2959,20 +2959,30 @@ function pdfDimLabels(doc,x,y,w,h,lenLabel,widLabel){
   const m=Math.min(w,h);
   // El escalado de Configuración nunca puede hacer que la letra supere ~26% del lado más
   // chico de la pieza: así "Muy grande" no se desborda ni empuja la cota hacia el centro
-  // (donde está el cuadradito de código/tapacanto).
-  const fs=Math.max(2,Math.min(7*esc,m*.26));
+  // (donde está el cuadradito de código/tapacanto). El piso (5.5pt) nunca baja de ahí,
+  // para que en piezas chicas la medida siga siendo legible en la impresión.
+  const fs=Math.max(5.5,Math.min(7*esc,m*.26));
   doc.setTextColor(70,70,70);
   doc.setFont(undefined,'bold');
   doc.setFontSize(fs);
-  // Pegadas cerca del borde (no corridas hacia el centro), para no competir nunca con el
-  // cuadradito central de código/tapacanto.
+  // Si la pieza es chica en las DOS dimensiones, las dos cotas centradas terminarían
+  // pisándose entre sí — en ese caso se combinan en un único texto "largo×ancho" centrado.
+  if(w<fs*1.7 && h<fs*1.7){
+    doc.text(`${lenLabel}×${widLabel}`,x+w/2,y+h/2,{align:'center',baseline:'middle'});
+    doc.setFont(undefined,'normal');
+    return;
+  }
+  // Pegadas cerca del borde en piezas con espacio de sobra; si la pieza es demasiado chica
+  // para la letra (legible) que necesita, se centra en vez de pegarse al borde — así, si no
+  // entra del todo, al menos queda simétrica y no se cruza por completo hacia un solo lado
+  // (arriba/afuera de la pieza), que es peor que quedar apenas ajustada al medio.
   if(w>0.8){
-    const clrY=Math.min(fs*0.8,h*0.16);
-    doc.text(lenLabel,x+w/2,y+Math.max(clrY,0.8),{align:'center'});
+    const clrY = h<fs*1.7 ? h/2 : Math.min(fs*0.8,h*0.16);
+    doc.text(lenLabel,x+w/2,y+Math.max(clrY,2),{align:'center',baseline:'middle'});
   }
   if(h>0.8){
-    const clrX=Math.min(fs*0.8,w*0.16);
-    doc.text(widLabel,x+Math.max(clrX,0.8),y+h/2,{align:'center',angle:90});
+    const clrX = w<fs*1.7 ? w/2 : Math.min(fs*0.8,w*0.16);
+    doc.text(widLabel,x+Math.max(clrX,2),y+h/2,{align:'center',angle:90,baseline:'middle'});
   }
   doc.setFont(undefined,'normal');
 }
@@ -2981,7 +2991,7 @@ function pdfDimLabels(doc,x,y,w,h,lenLabel,widLabel){
 function pdfCodigoFontSize(w,h){
   const esc=(ST.cfg&&ST.cfg.pdfFontScale)||1;
   const m=Math.min(w,h);
-  return Math.max(2.2,Math.min(6.5*esc,m*.13));
+  return Math.max(5,Math.min(6.5*esc,m*.13));
 }
 
 /* Dibuja círculos numerados en el punto medio de cada línea de corte, en el orden de e.cuts,
@@ -3009,15 +3019,15 @@ function pdfCodeBadge(doc,cx,cy,w,h,codigo,sd,colors){
   const fs=pdfCodigoFontSize(w,h);
   doc.setFont(undefined,'normal');doc.setFontSize(fs);
   const textW=doc.getTextWidth(codigo);
-  const padX=fs*0.32, padY=fs*0.28;
-  const boxW=Math.max(textW+padX*2, fs*1.1), boxH=fs*0.72+padY*2;
+  const padX=fs*0.28, padY=fs*0.18;
+  const boxW=Math.max(textW+padX*2, fs*1.05), boxH=fs*0.72+padY*2;
   doc.setDrawColor(170,170,170);doc.setLineWidth(.1);doc.setFillColor(255,255,255);
   doc.rect(cx-boxW/2,cy-boxH/2,boxW,boxH,'FD');
   doc.setTextColor(30,30,30);
   doc.text(codigo,cx,cy,{align:'center',baseline:'middle'});
   if(!(sd.top||sd.bot||sd.lft||sd.rgt)) return;
-  const s=Math.max(.7,Math.min(1.6,Math.min(w,h)*.08));
-  const gapY=boxH/2+s*1.5, gapX=boxW/2+s*1.5;
+  const s=Math.max(.5,Math.min(1,Math.min(w,h)*.05));
+  const gapY=boxH/2+.6, gapX=boxW/2+.6;
   doc.setLineWidth(.08);
   const tri=(x1,y1,x2,y2,x3,y3,color)=>{doc.setFillColor(...color);doc.setDrawColor(60,60,60);doc.triangle(x1,y1,x2,y2,x3,y3,'FD');};
   if(sd.top) tri(cx-s,cy-gapY+s*.5,cx+s,cy-gapY+s*.5,cx,cy-gapY-s*.7,colors.top);
@@ -3028,6 +3038,17 @@ function pdfCodeBadge(doc,cx,cy,w,h,codigo,sd,colors){
 
 /* Widget de tapacanto solo (sin código): para piezas demasiado chicas como para mostrar
    el código legible, se muestra únicamente el cuadradito con las flechas activas. */
+/* En una tira larga y finita (mucho largo, poco ancho o viceversa) hay espacio de sobra en
+   UN eje aunque falte en el otro. En vez de esconder el indicador de tapacanto entero,
+   lo corremos hacia un costado (usando el eje que sí tiene lugar) para que conviva con la
+   cota de medida sin pisarla nunca. */
+function pdfBadgeCenter(x,y,w,h){
+  let cx=x+w/2, cy=y+h/2;
+  if(h<12&&w>30) cx=x+w*0.80;
+  else if(w<12&&h>30) cy=y+h*0.80;
+  return {cx,cy};
+}
+
 function pdfTapacantoWidget(doc,cx,cy,w,h,sd,colors){
   if(!(sd.top||sd.bot||sd.lft||sd.rgt)) return;
   const sq=Math.max(1.1,Math.min(2.4,Math.min(w,h)*.10));
@@ -3102,8 +3123,9 @@ function exportPDF(){
       const colors={top:[61,214,140],bot:[96,165,250],lft:[251,191,36],rgt:[248,113,113]};
       if(w>16&&h>12){
         pdfCodeBadge(doc,x+w/2,y+h/2,w,h,c.pz.codigo,sd,colors);
-      } else {
-        pdfTapacantoWidget(doc,x+w/2,y+h/2,w,h,sd,colors);
+      } else if(Math.min(w,h)>9 || (h<12&&w>30) || (w<12&&h>30)){
+        const bc=pdfBadgeCenter(x,y,w,h);
+        pdfTapacantoWidget(doc,bc.cx,bc.cy,w,h,sd,colors);
       }
       pdfDimLabels(doc,x,y,w,h,String(fromMm(c.l)),String(fromMm(c.a)));
     });
@@ -3298,8 +3320,9 @@ window.ejecutarImpresion=function(){
       const colors={top:[61,214,140],bot:[96,165,250],lft:[251,191,36],rgt:[248,113,113]};
       if(w>10&&h>8){
         pdfCodeBadge(doc,x+w/2,y+h/2,w,h,c.pz.codigo,sd,colors);
-      } else {
-        pdfTapacantoWidget(doc,x+w/2,y+h/2,w,h,sd,colors);
+      } else if(Math.min(w,h)>9 || (h<12&&w>30) || (w<12&&h>30)){
+        const bc=pdfBadgeCenter(x,y,w,h);
+        pdfTapacantoWidget(doc,bc.cx,bc.cy,w,h,sd,colors);
       }
       pdfDimLabels(doc,x,y,w,h,String(fromMm(c.l)),String(fromMm(c.a)));
     });
