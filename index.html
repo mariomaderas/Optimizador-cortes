@@ -2892,12 +2892,57 @@ function exportPedidosJSON(){
     renglones:rows,
   };
   const json=JSON.stringify(payload,null,2);
+  mostrarModalExportJSON(json);
+}
+
+/* Modal con el JSON listo para copiar/pegar en otro sistema (o descargar como archivo),
+   igual que el flujo del Sistema de Pedidos. */
+function mostrarModalExportJSON(json){
+  $('modalRoot').innerHTML = `
+    <div class="modal-ov" id="mo" onclick="if(event.target.id==='mo')closeModal()">
+      <div class="modal-box" style="width:520px;">
+        <div class="modal-head"><h3>Exportar renglones (JSON)</h3><button class="btn icon ghost" onclick="closeModal()" style="font-size:16px">✕</button></div>
+        <div class="modal-body">
+          <div style="font-size:11.5px;color:var(--text2);line-height:1.6;">
+            Copiá este texto y pegalo en el Sistema de Pedidos (o en cualquier herramienta que acepte este formato), o descargá el archivo.
+          </div>
+          <textarea id="exportJsonText" rows="12" readonly onclick="this.select()" style="width:100%;background:var(--bg2);border:1px solid var(--line2);border-radius:7px;color:var(--text0);padding:8px 10px;font-size:11px;font-family:'JetBrains Mono',monospace;resize:vertical;"></textarea>
+        </div>
+        <div class="modal-foot">
+          <button class="btn ghost" onclick="closeModal()">Cerrar</button>
+          <button class="btn ghost" onclick="descargarExportJSON()">Descargar</button>
+          <button class="btn primary" onclick="copiarExportJSON()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+            Copiar
+          </button>
+        </div>
+      </div>
+    </div>`;
+  $('exportJsonText').value = json;
+}
+window.mostrarModalExportJSON = mostrarModalExportJSON;
+
+function copiarExportJSON(){
+  const ta=$('exportJsonText');
+  ta.focus(); ta.select();
+  const hacerFallback=()=>{ try{ document.execCommand('copy'); toast('Copiado al portapapeles.'); }catch(e){ toast('No se pudo copiar. Seleccioná el texto manualmente.','err'); } };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(ta.value).then(()=>toast('Copiado al portapapeles.')).catch(hacerFallback);
+  } else {
+    hacerFallback();
+  }
+}
+window.copiarExportJSON = copiarExportJSON;
+
+function descargarExportJSON(){
+  const json=$('exportJsonText').value;
   const a=document.createElement('a');
   a.download='lista_para_pedidos.json';
   a.href=URL.createObjectURL(new Blob([json],{type:'application/json'}));
   a.click();
-  toast('Lista exportada para el Sistema de Pedidos.');
+  toast('Archivo descargado.');
 }
+window.descargarExportJSON = descargarExportJSON;
 window.exportPedidosJSON=exportPedidosJSON;
 
 function exportCSV(){
